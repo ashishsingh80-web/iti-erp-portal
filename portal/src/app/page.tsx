@@ -43,10 +43,7 @@ export default async function HomePage({
     trend: [],
     instituteComparison: [],
     tradeDemand: [],
-    sessionFinancials: [],
-    studentStatusMix: [],
-    pendingPipelines: [],
-    concernAlerts: []
+    sessionFinancials: []
   };
   const insights =
     insightsResult.status === "fulfilled"
