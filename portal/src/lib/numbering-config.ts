@@ -129,7 +129,7 @@ export async function previewGeneratedCode(kind: NumberingKind, context: Numberi
 
 export async function reserveGeneratedCode(kind: NumberingKind, context: NumberingContext = {}) {
   const previous = reserveQueue;
-  let release: (() => void) | null = null;
+  let release: (() => void) | undefined;
   reserveQueue = new Promise<void>((resolve) => {
     release = resolve;
   });
@@ -152,6 +152,6 @@ export async function reserveGeneratedCode(kind: NumberingKind, context: Numberi
     });
     return code;
   } finally {
-    if (release) release();
+    release?.();
   }
 }
