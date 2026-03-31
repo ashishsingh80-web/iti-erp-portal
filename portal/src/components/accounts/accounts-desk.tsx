@@ -413,7 +413,7 @@ export function AccountsDesk({
     const details = `Actions ${payload.actionsCount || 0} • Blocked ${payload.blockedCount || 0}`;
     setMessage(dryRun ? `Dry run complete. ${details}` : `Reconciliation completed. ${details}`);
     showToast({
-      kind: payload.blockedCount ? "warning" : "success",
+      kind: payload.blockedCount ? "info" : "success",
       title: dryRun ? "Dry run complete" : "Reconciliation complete",
       message: details
     });
