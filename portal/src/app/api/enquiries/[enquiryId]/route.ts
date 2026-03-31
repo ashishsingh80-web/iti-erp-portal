@@ -4,33 +4,33 @@ import { assertUserActionAccess } from "@/lib/access";
 import { toApiErrorResponse } from "@/lib/api-error";
 import { requireUser } from "@/lib/auth";
 import { formatDateOnly, updateEnquiry } from "@/lib/services/enquiry-service";
-import { enquiryPayloadSchema, enquiryStatusValues } from "@/lib/validations/enquiry";
+import { enquiryStatusValues } from "@/lib/validations/enquiry";
 
-const updateSchema = enquiryPayloadSchema
-  .pick({
-    status: true,
-    nextFollowUpDate: true,
-    lastContactDate: true,
-    assignedCounsellor: true,
-    followUpNotes: true,
-    lostReason: true,
-    budgetConcern: true,
-    notes: true
+const optionalText = z.string().trim().optional().or(z.literal(""));
+const optionalDate = z
+  .string()
+  .trim()
+  .optional()
+  .or(z.literal(""))
+  .refine((value) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value), "Date must be in YYYY-MM-DD format");
+
+const updateSchema = z
+  .object({
+    status: z.enum(enquiryStatusValues).optional(),
+    nextFollowUpDate: optionalDate,
+    lastContactDate: optionalDate,
+    assignedCounsellor: optionalText,
+    followUpNotes: optionalText,
+    lostReason: optionalText,
+    budgetConcern: optionalText,
+    notes: optionalText
   })
-  .partial()
   .superRefine((value, ctx) => {
     if (value.status === "LOST" && !value.lostReason?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["lostReason"],
         message: "Lost reason is required when enquiry is marked as lost"
-      });
-    }
-    if (value.status && !enquiryStatusValues.includes(value.status)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["status"],
-        message: "Invalid enquiry status"
       });
     }
   });
