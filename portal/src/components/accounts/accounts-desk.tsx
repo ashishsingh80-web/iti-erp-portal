@@ -437,7 +437,7 @@ export function AccountsDesk({
       showToast({ kind: "success", title: "Repair summary copied" });
     } catch {
       setMessage(`Copy failed. Summary:\n${text}`);
-      showToast({ kind: "warning", title: "Clipboard unavailable", message: "Summary added to message area." });
+      showToast({ kind: "info", title: "Clipboard unavailable", message: "Summary added to message area." });
     }
   }
 
