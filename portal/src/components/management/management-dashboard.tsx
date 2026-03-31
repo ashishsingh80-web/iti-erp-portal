@@ -140,7 +140,7 @@ export async function ManagementDashboard({
           <p className="eyebrow-compact">{t(lang, "Institute Comparison")}</p>
           <h4 className="mt-2 text-xl font-semibold text-slate-950">{t(lang, "Student Load And Risk")}</h4>
           <div className="mt-4 space-y-3">
-            {insights.instituteComparison.map((item) => (
+            {insights.instituteComparison.map((item: (typeof insights.instituteComparison)[number]) => (
               <div key={item.code || item.institute} className="rounded-2xl border border-slate-100 bg-white px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -162,7 +162,7 @@ export async function ManagementDashboard({
           <p className="eyebrow-compact">{t(lang, "Trade Demand")}</p>
           <h4 className="mt-2 text-xl font-semibold text-slate-950">{t(lang, "Admissions And Enquiry Mix")}</h4>
           <div className="mt-4 space-y-3">
-            {insights.tradeDemand.map((item) => (
+            {insights.tradeDemand.map((item: (typeof insights.tradeDemand)[number]) => (
               <div key={`${item.trade}-${item.institute}`} className="rounded-2xl border border-slate-100 bg-white px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -184,7 +184,7 @@ export async function ManagementDashboard({
           <p className="eyebrow-compact">{t(lang, "Session Finance")}</p>
           <h4 className="mt-2 text-xl font-semibold text-slate-950">{t(lang, "Collections And Outstanding")}</h4>
           <div className="mt-4 space-y-3">
-            {insights.sessionFinancials.map((item) => (
+            {insights.sessionFinancials.map((item: (typeof insights.sessionFinancials)[number]) => (
               <div key={item.session} className="rounded-2xl border border-slate-100 bg-white px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-900">{item.session}</p>
