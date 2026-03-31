@@ -199,7 +199,7 @@ export function CommunicationDesk() {
 
       const payload = (result as any)?.result || {};
       showToast({
-        kind: payload.failedCount ? "warning" : "success",
+        kind: payload.failedCount ? "info" : "success",
         title: "Queue send complete",
         message: `Processed ${payload.processed || 0} messages • Sent ${payload.sentCount || 0} • Failed ${payload.failedCount || 0}`
       });
