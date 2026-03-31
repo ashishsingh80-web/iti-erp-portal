@@ -12,8 +12,16 @@ type CacheEntry<T> = {
   expiresAt: number;
 };
 
+type DashboardInsights = {
+  managementCards: Array<{ label: string; value: string; helper: string }>;
+  trend: Array<{ month: string; admissions: number; enquiries: number; conversions: number; conversionRate: number }>;
+  instituteComparison: Array<{ institute: string; code: string; totalStudents: number; docsPending: number; feeDueCases: number }>;
+  tradeDemand: Array<{ trade: string; institute: string; admissions: number; enquiries: number }>;
+  sessionFinancials: Array<{ session: string; totalStudents: number; collections: number; dueAmount: number }>;
+};
+
 const dashboardMetricsCache = new Map<string, CacheEntry<DashboardMetric[]>>();
-const dashboardInsightsCache = new Map<string, CacheEntry<Awaited<ReturnType<typeof getDashboardInsights>>>>();
+const dashboardInsightsCache = new Map<string, CacheEntry<DashboardInsights>>();
 
 function buildInstituteKey(instituteCode?: string | null, instituteName?: string | null) {
   const code = String(instituteCode || "").trim();
@@ -332,7 +340,7 @@ export async function getDashboardMetrics(selectedSession?: string | null): Prom
   return metrics;
 }
 
-export async function getDashboardInsights(selectedSession?: string | null) {
+export async function getDashboardInsights(selectedSession?: string | null): Promise<DashboardInsights> {
   const sessionKey = selectedSession && selectedSession !== "ALL_ACTIVE" ? selectedSession : "ALL_ACTIVE";
   const monthKey = toLocalMonthKey(new Date());
   const cacheKey = `${sessionKey}:${monthKey}`;
