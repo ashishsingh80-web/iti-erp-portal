@@ -12,12 +12,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ stude
     const { studentId } = await context.params;
     const payload = undertakingPatchSchema.parse(await request.json());
 
-    if (payload?.action === "REVIEW_SIGNED_UPLOAD" && "status" in payload) {
+    if (payload?.action === "REVIEW_SIGNED_UPLOAD") {
       if (!["SUPER_ADMIN", "ADMIN"].includes(user.role)) {
         return NextResponse.json({ ok: false, message: "Only admin can review signed undertakings" }, { status: 403 });
       }
 
-      const result = await reviewUndertaking(studentId, payload.status, user.id);
+      const reviewPayload = payload as { status: "VERIFIED" | "REJECTED" | "INCOMPLETE" };
+      const result = await reviewUndertaking(studentId, reviewPayload.status, user.id);
 
       return NextResponse.json({
         ok: true,
