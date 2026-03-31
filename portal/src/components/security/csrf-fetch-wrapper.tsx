@@ -15,7 +15,8 @@ export function CsrfFetchWrapper() {
 
     // Inject CSRF header into all client-side mutation requests.
     window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-      const method = (init?.method || (typeof input === "object" ? input.method : undefined) || "GET").toString().toUpperCase();
+      const requestMethod = input instanceof Request ? input.method : undefined;
+      const method = (init?.method || requestMethod || "GET").toString().toUpperCase();
       const isUnsafeMethod = method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
 
       if (!isUnsafeMethod) {
