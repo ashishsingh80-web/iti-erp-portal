@@ -91,7 +91,7 @@ export async function ManagementDashboard({
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {insights.managementCards.map((card) => (
+          {insights.managementCards.map((card: (typeof insights.managementCards)[number]) => (
             <article key={card.label} className="rounded-3xl border border-slate-100 bg-white px-5 py-4">
               <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{t(lang, card.label)}</p>
               <p className="mt-3 text-3xl font-semibold text-slate-950">{card.value}</p>
@@ -125,7 +125,7 @@ export async function ManagementDashboard({
         </form>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {dashboardCards.slice(1, 5).map((card) => (
+          {dashboardCards.slice(1, 5).map((card: (typeof dashboardCards)[number]) => (
             <article key={card.label} className="rounded-3xl border border-slate-100 bg-slate-50 px-5 py-4">
               <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{t(lang, card.label)}</p>
               <p className="mt-2 text-2xl font-semibold text-slate-950">{displayMetricValue(card.label, card.value)}</p>
@@ -220,7 +220,7 @@ export async function ManagementDashboard({
               </tr>
             </thead>
             <tbody>
-              {insights.trend.map((item) => (
+              {insights.trend.map((item: (typeof insights.trend)[number]) => (
                 <tr key={item.month} className="rounded-2xl bg-slate-50 text-sm text-slate-700">
                   <td className="rounded-l-2xl px-3 py-3 font-semibold text-slate-900">{item.month}</td>
                   <td className="px-3 py-3">{item.admissions}</td>
