@@ -228,7 +228,7 @@ export function CommunicationDesk() {
 
       const delivery = (result as any)?.result || {};
       showToast({
-        kind: delivery.delivered ? "success" : "warning",
+        kind: delivery.delivered ? "success" : "info",
         title: delivery.delivered ? "Message sent" : "Message failed",
         message: delivery.message || (delivery.delivered ? "Delivered successfully." : "Delivery failed.")
       });
