@@ -26,6 +26,7 @@ export async function createAgentCollection(
   if (!rawPayload.agentCode?.trim()) throw new Error("Agent code is required");
   if (!rawPayload.paymentMode?.trim()) throw new Error("Payment mode is required");
   if (!(totalAmount > 0)) throw new Error("Total amount must be greater than 0");
+  const paymentMode = rawPayload.paymentMode.trim();
 
   const agent = await prisma.agent.findUnique({
     where: { agentCode: rawPayload.agentCode.trim() }
@@ -56,7 +57,7 @@ export async function createAgentCollection(
         totalAmount,
         allocatedAmount,
         unallocatedAmount: totalAmount - allocatedAmount,
-        paymentMode: rawPayload.paymentMode.trim(),
+        paymentMode,
         referenceNo: rawPayload.referenceNo?.trim() || null,
         remark: rawPayload.remark?.trim() || null
       }
@@ -75,7 +76,7 @@ export async function createAgentCollection(
         amountPaid: allocation.amountAllocated,
         payerType: FeePayerType.AGENT,
         collectionScope: allocations.length > 1 ? FeeCollectionScope.BULK : FeeCollectionScope.STUDENT_WISE,
-        paymentMode: rawPayload.paymentMode.trim(),
+        paymentMode,
         transactionDate: collectionDate,
         agentId: agent.id,
         allocationGroup: collection.id,
