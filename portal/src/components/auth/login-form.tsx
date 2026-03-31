@@ -26,7 +26,7 @@ export function LoginForm() {
         body: JSON.stringify({ email, password })
       });
 
-      const result = await response.json();
+      const result = await response.json().catch(() => null);
 
       if (!response.ok) {
         const nextError = result?.message || "Unable to log in";
