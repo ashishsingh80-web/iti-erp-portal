@@ -1,0 +1,46 @@
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Smart Search</p>
+      <h3>Student List</h3>
+      <p class="panel-copy">Quick filters, search-as-you-type, and clean status visibility for staff follow-up.</p>
+    </div>
+    <div class="table-actions">
+      <span class="pill" id="studentCountPill">0 records</span>
+    </div>
+  </div>
+
+  <div class="filters-grid">
+    <div class="field">
+      <label for="studentSearch">Search</label>
+      <input type="text" id="studentSearch" placeholder="Name, ID, mobile, trade">
+    </div>
+    <div class="field">
+      <label for="filterInstitute">Institute</label>
+      <select id="filterInstitute"></select>
+    </div>
+    <div class="field">
+      <label for="filterTrade">Trade</label>
+      <select id="filterTrade"></select>
+    </div>
+    <div class="field">
+      <label for="filterSession">Session</label>
+      <input type="text" id="filterSession" placeholder="2026-27">
+    </div>
+    <div class="field">
+      <label for="filterYear">Year</label>
+      <select id="filterYear"></select>
+    </div>
+    <div class="field">
+      <label for="filterAdmissionStatus">Admission Status</label>
+      <select id="filterAdmissionStatus"></select>
+    </div>
+  </div>
+
+  <div class="button-row" style="margin-top:18px;">
+    <button class="btn" type="button" onclick="applyStudentFilters()">Apply Filters</button>
+    <button class="btn secondary" type="button" onclick="resetStudentFilters()">Clear Filters</button>
+  </div>
+
+  <div id="studentsTable" class="table-shell" style="margin-top:18px;"></div>
+</div>

@@ -1,0 +1,61 @@
+{
+  "entries": [
+    {
+      "entityType": "student",
+      "entityId": "cmnaukf0k0002ywpp7rwrgqay",
+      "cardNumber": "IDC-STU-WRGQAY",
+      "issueVersion": 5,
+      "code": "ITI01-EL-2026-001",
+      "fullName": "Yashpal Singh",
+      "status": "ACTIVE",
+      "statusNote": "",
+      "statusUpdatedAt": "2026-03-30T12:21:04.602Z",
+      "statusUpdatedBy": "Portal Admin",
+      "printCount": 5,
+      "firstPrintedAt": "2026-03-30T12:21:04.602Z",
+      "lastPrintedAt": "2026-03-31T04:59:47.621Z",
+      "lastReason": "Duplicate / Reissue",
+      "lastPrintedBy": "Portal Admin",
+      "replacementStatus": "NONE",
+      "replacementRequestedAt": "",
+      "replacementRequestedBy": "",
+      "replacementReason": "",
+      "replacementFee": "",
+      "replacementPaymentMode": "",
+      "replacementReferenceNo": "",
+      "replacementReceiptNumber": "",
+      "replacementFeePostedAt": "",
+      "replacementFeePostedBy": "",
+      "replacementApprovedAt": "",
+      "replacementApprovedBy": "",
+      "history": [
+        {
+          "printedAt": "2026-03-30T12:21:04.602Z",
+          "reason": "Initial Issue",
+          "printedBy": "Portal Admin"
+        },
+        {
+          "printedAt": "2026-03-31T04:42:48.314Z",
+          "reason": "Duplicate / Reissue",
+          "printedBy": "Portal Admin"
+        },
+        {
+          "printedAt": "2026-03-31T04:48:13.236Z",
+          "reason": "Duplicate / Reissue",
+          "printedBy": "Portal Admin"
+        },
+        {
+          "printedAt": "2026-03-31T04:56:07.076Z",
+          "reason": "Duplicate / Reissue",
+          "printedBy": "Portal Admin"
+        },
+        {
+          "printedAt": "2026-03-31T04:59:47.621Z",
+          "reason": "Duplicate / Reissue",
+          "printedBy": "Portal Admin"
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-03-31T04:59:47.621Z"
+}

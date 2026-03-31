@@ -1,0 +1,180 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatInr } from "@/lib/currency";
+import { fetchJsonSafe } from "@/lib/fetch-json";
+import { SkeletonBlock } from "@/components/ui/skeleton-block";
+
+type AgentOutstandingRow = {
+  agentCode: string;
+  agentName: string;
+  totalStudents: number;
+  committedAmount: string;
+  paidAgainstStudents: string;
+  outstandingAmount: string;
+  totalCollections: string;
+  unallocatedBalance: string;
+  studentRows: Array<{
+    studentId: string;
+    studentCode: string;
+    fullName: string;
+    session: string;
+    yearLabel: string;
+    finalFees: string;
+    paidAmount: string;
+    dueAmount: string;
+  }>;
+};
+
+export function AgentOutstandingPanel() {
+  const [rows, setRows] = useState<AgentOutstandingRow[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    void loadRows();
+  }, []);
+
+  async function loadRows() {
+    setError("");
+    setLoading(true);
+    const response = await fetch("/api/fees/agent-collections");
+    const result = await fetchJsonSafe<any>(response);
+
+    if (!response.ok) {
+      setError(result?.message || "Unable to load agent outstanding ledger");
+      setLoading(false);
+      return;
+    }
+
+    setRows(result.agentOutstandingRows || []);
+    setLoading(false);
+  }
+
+  return (
+    <section className="surface p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Fees Module</p>
+          <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">Agent Outstanding Ledger</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            See agent-wise committed amount, collected amount, unallocated balance, and pending student dues.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <a className="rounded-2xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white" href="/api/reports?report=agent-statement&format=csv">
+            Export Agent Statement
+          </a>
+          <button className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white" onClick={() => void loadRows()} type="button">
+            Refresh Ledger
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+      ) : null}
+
+      <div className="mt-6 grid gap-4">
+        {loading ? (
+          [1, 2].map((item) => (
+            <article key={item} className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <SkeletonBlock className="h-6 w-40" />
+                  <SkeletonBlock className="mt-2 h-4 w-24" />
+                </div>
+                <SkeletonBlock className="h-8 w-32" />
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {[1, 2, 3, 4, 5].map((card) => (
+                  <div key={card} className="rounded-2xl bg-white px-4 py-3">
+                    <SkeletonBlock className="h-4 w-24" />
+                    <SkeletonBlock className="mt-2 h-5 w-16" />
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))
+        ) : rows.length ? (
+          rows.map((row) => (
+            <article key={row.agentCode} className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h4 className="font-semibold text-slate-900">{row.agentName}</h4>
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-500">{row.agentCode}</p>
+                </div>
+                <span className="rounded-full bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700">
+                  Outstanding {formatInr(row.outstandingAmount)}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Students</p>
+                  <p className="mt-1 font-semibold text-slate-900">{row.totalStudents}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Committed</p>
+                  <p className="mt-1 font-semibold text-slate-900">{formatInr(row.committedAmount)}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Paid Against Students</p>
+                  <p className="mt-1 font-semibold text-emerald-700">{formatInr(row.paidAgainstStudents)}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Collections Taken</p>
+                  <p className="mt-1 font-semibold text-slate-900">{formatInr(row.totalCollections)}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Unallocated Balance</p>
+                  <p className="mt-1 font-semibold text-amber-700">{formatInr(row.unallocatedBalance)}</p>
+                </div>
+              </div>
+
+              <div className="data-table-wrap mt-4">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Student</th>
+                      <th>Session</th>
+                      <th>Final Fee</th>
+                      <th>Paid</th>
+                      <th>Due</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {row.studentRows.length ? (
+                      row.studentRows.map((student) => (
+                        <tr key={student.studentId} className="border-t border-slate-100">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-900">{student.studentCode} • {student.fullName}</div>
+                            <div className="text-xs text-slate-500">{student.yearLabel}</div>
+                          </td>
+                          <td className="px-4 py-3">{student.session}</td>
+                          <td className="px-4 py-3">{formatInr(student.finalFees)}</td>
+                          <td className="px-4 py-3">{formatInr(student.paidAmount)}</td>
+                          <td className="px-4 py-3 font-semibold text-rose-700">{formatInr(student.dueAmount)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="data-table-empty" colSpan={5}>
+                          No outstanding students for this agent.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="rounded-3xl border border-dashed border-slate-200 px-6 py-10 text-sm text-slate-500">
+            No active agent outstanding ledger rows yet. Once agent-managed students and collections exist, this ledger will appear here.
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}

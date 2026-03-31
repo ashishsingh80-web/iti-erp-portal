@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(217, 106, 49, 0.16), transparent 28%),
+    radial-gradient(circle at right top, rgba(15, 118, 110, 0.16), transparent 24%),
+    linear-gradient(180deg, #f8f5ef 0%, #f1f4ef 100%);
+  color: #101417;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    min-height: auto;
+    background: white !important;
+  }
+
+  body * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .surface {
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    background: transparent !important;
+  }
+
+  .receipt-sheet {
+    width: 100%;
+    max-width: 180mm;
+    min-height: 135mm;
+    margin: 0 auto;
+    background: white !important;
+  }
+
+  .id-card-grid {
+    display: grid !important;
+    grid-template-columns: 85.6mm !important;
+    gap: 6mm !important;
+    width: 85.6mm !important;
+    margin: 8mm auto 0 !important;
+    justify-items: center !important;
+    justify-content: center !important;
+    align-content: start !important;
+  }
+
+  .id-card-print-page {
+    width: 100% !important;
+    min-height: auto !important;
+  }
+
+  .id-card-face {
+    width: 85.6mm !important;
+    height: 54mm !important;
+    overflow: hidden !important;
+    border-radius: 3.2mm !important;
+    background: white !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+  }
+
+  .id-card-face .p-6 {
+    padding: 2.4mm !important;
+  }
+
+  .id-card-face .gap-6 {
+    gap: 2.2mm !important;
+  }
+
+  .id-card-face .gap-5,
+  .id-card-face .gap-4,
+  .id-card-face .gap-3 {
+    gap: 1.5mm !important;
+  }
+
+  .id-card-face .h-20.w-20 {
+    height: 9mm !important;
+    width: 9mm !important;
+  }
+
+  .id-card-face .h-32.w-28 {
+    height: 15mm !important;
+    width: 11.5mm !important;
+  }
+
+  .id-card-face .text-2xl {
+    font-size: 9pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .id-card-face .text-xl {
+    font-size: 8pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .id-card-face .text-lg {
+    font-size: 7pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .id-card-face .text-base {
+    font-size: 6pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .id-card-face .text-sm {
+    font-size: 5pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .id-card-face .text-xs {
+    font-size: 4.2pt !important;
+    line-height: 1.03 !important;
+  }
+
+  .id-card-face .rounded-3xl,
+  .id-card-face .rounded-2xl {
+    border-radius: 2mm !important;
+  }
+
+  .id-card-face .px-4,
+  .id-card-face .p-4 {
+    padding: 1.8mm !important;
+  }
+
+  .id-card-face .py-3 {
+    padding-top: 1.5mm !important;
+    padding-bottom: 1.5mm !important;
+  }
+}
+
+.surface {
+  @apply rounded-3xl border border-white/60 bg-white/80 shadow-soft backdrop-blur;
+}
+
+.eyebrow {
+  @apply text-xs uppercase tracking-[0.35em] text-slate-500;
+}
+
+.eyebrow-compact {
+  @apply text-xs uppercase tracking-[0.24em] text-slate-500;
+}
+
+.chip {
+  @apply rounded-full px-3 py-1 text-xs font-medium;
+}
+
+.chip-success {
+  @apply chip bg-emerald-50 text-emerald-800;
+}
+
+.chip-warning {
+  @apply chip bg-amber-50 text-amber-700;
+}
+
+.chip-neutral {
+  @apply chip bg-slate-100 text-slate-700;
+}
+
+.btn-primary {
+  @apply rounded-2xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-900;
+}
+
+.btn-secondary {
+  @apply rounded-2xl bg-slate-200 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-300;
+}
+
+.btn-dark {
+  @apply rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-black;
+}
+
+.btn-danger {
+  @apply rounded-2xl bg-rose-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-800;
+}
+
+.data-table-wrap {
+  @apply overflow-x-auto rounded-3xl border border-slate-100 bg-white;
+}
+
+.data-table {
+  @apply min-w-full text-left text-sm;
+}
+
+.data-table thead {
+  @apply bg-slate-50 text-slate-500;
+}
+
+.data-table th {
+  @apply px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em];
+}
+
+.data-table td {
+  @apply px-4 py-3 align-top text-slate-700;
+}
+
+.data-table tbody tr {
+  @apply border-t border-slate-100;
+}
+
+.data-table-empty {
+  @apply px-4 py-8 text-center text-sm text-slate-500;
+}
+
+@keyframes portal-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes portal-toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.portal-toast-enter {
+  animation: portal-toast-enter 180ms ease-out;
+}
+
+.portal-toast-progress {
+  transform-origin: left center;
+  animation-name: portal-toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}

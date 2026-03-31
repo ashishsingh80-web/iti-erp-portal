@@ -1,0 +1,28 @@
+{
+  "hierarchy": {
+    "Uttar Pradesh": {
+      "districts": {
+        "Lucknow": {
+          "tehsils": {
+            "Bakshi Ka Talab": {
+              "blocks": {
+                "BKT": {
+                  "wards": {
+                    "Ward 1": [
+                      "Village A",
+                      "Village B"
+                    ],
+                    "Ward 2": [
+                      "Village C"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "updatedAt": "2026-03-29T12:33:39.404Z"
+}

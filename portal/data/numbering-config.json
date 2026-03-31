@@ -1,0 +1,39 @@
+{
+  "student": {
+    "prefix": "ADM-{institute}-{trade}",
+    "postfix": "",
+    "includeSession": true,
+    "startNumber": 1,
+    "nextNumber": 2,
+    "padLength": 3,
+    "separator": "-"
+  },
+  "agent": {
+    "prefix": "AG",
+    "postfix": "",
+    "includeSession": false,
+    "startNumber": 1,
+    "nextNumber": 1,
+    "padLength": 3,
+    "separator": "-"
+  },
+  "employee": {
+    "prefix": "EMP",
+    "postfix": "",
+    "includeSession": false,
+    "startNumber": 1,
+    "nextNumber": 1,
+    "padLength": 3,
+    "separator": "-"
+  },
+  "receipt": {
+    "prefix": "RCPT",
+    "postfix": "",
+    "includeSession": false,
+    "startNumber": 1,
+    "nextNumber": 3,
+    "padLength": 4,
+    "separator": "-"
+  },
+  "updatedAt": "2026-03-31T05:33:17.247Z"
+}

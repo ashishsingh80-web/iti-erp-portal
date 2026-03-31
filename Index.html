@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">ITI</div>
+          <div>
+            <p class="eyebrow">Fast Operations</p>
+            <h1 id="appTitle">Staff Panel</h1>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-btn active" data-page="dashboardPage" onclick="showPage('dashboardPage', this)">Dashboard</button>
+          <button class="nav-btn" data-page="admissionPage" onclick="showPage('admissionPage', this)">Admission</button>
+          <button class="nav-btn" data-page="studentsPage" onclick="showPage('studentsPage', this)">Students</button>
+        </nav>
+
+        <div class="sidebar-card">
+          <p class="eyebrow">Performance Notes</p>
+          <ul class="compact-list">
+            <li>Cached student and master reads</li>
+            <li>Grouped write operations for sheet speed</li>
+            <li>Debounced search and lightweight reloads</li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section class="hero">
+          <div>
+            <p class="eyebrow">Admission Operations</p>
+            <h2 id="pageTitle">Dashboard</h2>
+            <p class="hero-copy">A faster, cleaner ITI ERP surface built for staff who need instant visibility and less friction.</p>
+          </div>
+          <div class="hero-chip-row">
+            <span class="chip">Fast filters</span>
+            <span class="chip">Safe writes</span>
+            <span class="chip">Better dashboard</span>
+          </div>
+        </section>
+
+        <section id="globalNotice" class="status-banner hidden"></section>
+
+        <section id="dashboardPage" class="page active">
+          <?!= include('Dashboard'); ?>
+        </section>
+
+        <section id="admissionPage" class="page">
+          <?!= include('Admission'); ?>
+        </section>
+
+        <section id="studentsPage" class="page">
+          <?!= include('Students'); ?>
+        </section>
+      </main>
+    </div>
+
+    <?!= include('Scripts'); ?>
+  </body>
+</html>

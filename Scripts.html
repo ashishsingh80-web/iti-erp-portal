@@ -1,0 +1,475 @@
+<script>
+  let masterData = null;
+  let isSavingAdmission = false;
+  let studentSearchTimer = null;
+
+  function initApp() {
+    setAppLoadingState();
+
+    google.script.run
+      .withSuccessHandler(function(payload) {
+        document.getElementById('appTitle').textContent = payload.appTitle || 'ITI Staff Panel';
+        masterData = payload.masters || {};
+        setupMasters(masterData);
+        renderDashboard(payload.dashboard || {});
+        renderStudents(payload.students || []);
+        bindStudentSearch();
+        bindQuickReloads();
+        showGlobalNotice('App loaded with cached masters and student data.', 'success', 2400);
+      })
+      .withFailureHandler(function(err) {
+        showGlobalNotice('Initial load failed: ' + messageOf(err), 'error');
+      })
+      .bootstrapApp();
+  }
+
+  function showPage(pageId, btn) {
+    document.querySelectorAll('.page').forEach(function(page) {
+      page.classList.remove('active');
+    });
+
+    document.querySelectorAll('.nav-btn').forEach(function(item) {
+      item.classList.remove('active');
+    });
+
+    const page = document.getElementById(pageId);
+    if (page) page.classList.add('active');
+    if (btn) btn.classList.add('active');
+
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle && btn) pageTitle.textContent = btn.textContent;
+  }
+
+  function setAppLoadingState() {
+    const cards = document.getElementById('dashboardCards');
+    if (cards) {
+      cards.innerHTML = Array.from({ length: 4 }).map(function() {
+        return '<div class="card skeleton" style="height:132px;"></div>';
+      }).join('');
+    }
+
+    ['recentAdmissions', 'pendingWork', 'dueList', 'studentsTable'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.innerHTML = '<div class="loading-state">Loading...</div>';
+      }
+    });
+  }
+
+  function loadDashboard() {
+    google.script.run
+      .withSuccessHandler(renderDashboard)
+      .withFailureHandler(function(err) {
+        showGlobalNotice('Dashboard load failed: ' + messageOf(err), 'error');
+      })
+      .getDashboardData();
+  }
+
+  function loadStudents() {
+    const container = document.getElementById('studentsTable');
+    if (container) container.innerHTML = '<div class="loading-state">Refreshing students...</div>';
+
+    google.script.run
+      .withSuccessHandler(renderStudents)
+      .withFailureHandler(function(err) {
+        showGlobalNotice('Students load failed: ' + messageOf(err), 'error');
+      })
+      .getStudents(getStudentFilters());
+  }
+
+  function setupMasters(data) {
+    const staticOptions = data.staticOptions || {};
+
+    fillSelectFromObjects('Institute_ID', data.institutes || [], 'id', 'name', true);
+    fillSelect('Trade', uniqueValues((data.trades || []).map(function(item) { return item.trade; })), true);
+    fillSelect('Year', staticOptions.year || [], true);
+    fillSelect('Gender', staticOptions.gender || [], true);
+    fillSelect('Category', staticOptions.category || [], true);
+    fillSelect('Payment_Mode', staticOptions.paymentMode || [], true);
+    fillSelect('Photo_Available', staticOptions.photoAvailable || [], true);
+    fillSelect('Caste_Certificate_Available', staticOptions.casteCertificate || [], true);
+    fillSelect('Income_Certificate_Available', staticOptions.incomeCertificate || [], true);
+    fillSelect('Scholarship_Application_Status', staticOptions.scholarshipStatus || [], true);
+    fillSelect('Admission_Form_Status', staticOptions.admissionFormStatus || [], true);
+    fillSelect('Documents_Verified_Status', staticOptions.documentStatus || [], true);
+    fillSelect('Undertaking_Signed_Status', staticOptions.undertakingStatus || [], true);
+    fillSelectFromObjects('Agent_ID', data.agents || [], 'id', 'id', true);
+
+    fillSelectFromObjects('filterInstitute', data.institutes || [], 'id', 'name', false, 'All Institutes');
+    fillSelect('filterTrade', uniqueValues((data.trades || []).map(function(item) { return item.trade; })), false, 'All Trades');
+    fillSelect('filterYear', staticOptions.year || [], false, 'All Years');
+    fillSelect('filterAdmissionStatus', ['Pending', 'In Progress', 'Completed', 'Not Started'], false, 'All Admission Status');
+  }
+
+  function renderDashboard(data) {
+    const cards = data.cards || {};
+    const dashboardCards = document.getElementById('dashboardCards');
+    if (dashboardCards) {
+      const items = [
+        ['Total Students', cards.totalStudents || 0],
+        ['Pending Admissions', cards.pendingAdmissions || 0],
+        ['Documents Pending', cards.documentsPending || 0],
+        ['Undertakings Pending', cards.undertakingsPending || 0],
+        ['PRN Pending', cards.prnPending || 0],
+        ['SCVT Pending', cards.scvtPending || 0],
+        ['Scholarship Queries', cards.scholarshipQueries || 0],
+        ['Due Students', cards.dueStudents || 0]
+      ];
+
+      dashboardCards.innerHTML = items.map(function(entry) {
+        return '<article class="card"><h4>' + escapeHtml(entry[0]) + '</h4><div class="value">' + escapeHtml(String(entry[1])) + '</div></article>';
+      }).join('');
+    }
+
+    renderTable('recentAdmissions', ['Date', 'Student Name', 'Trade', 'Institute', 'Admission Status'], (data.recentAdmissions || []).map(function(row) {
+      return [row.date, row.studentName, row.trade, row.institute, row.admissionStatus];
+    }));
+
+    renderTable('pendingWork', ['Student Name', 'Missing Step', 'Responsible Team'], (data.pendingWork || []).map(function(row) {
+      return [row.studentName, row.missingStep, row.responsibleTeam];
+    }));
+
+    renderTable('dueList', ['Student Name', 'Final Fees', 'Paid', 'Due'], (data.dueList || []).map(function(row) {
+      return [row.studentName, row.finalFees, row.paid, row.due];
+    }));
+  }
+
+  function renderTable(containerId, headers, rows) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (!rows.length) {
+      container.innerHTML = '<div class="empty-state">No data available.</div>';
+      return;
+    }
+
+    const html = `
+      <table>
+        <thead>
+          <tr>${headers.map(function(header) { return '<th>' + escapeHtml(header) + '</th>'; }).join('')}</tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(row) {
+            return '<tr>' + row.map(function(cell) {
+              return '<td>' + escapeHtml(String(cell === null || cell === undefined ? '' : cell)) + '</td>';
+            }).join('') + '</tr>';
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  function renderStudents(rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const countPill = document.getElementById('studentCountPill');
+    if (countPill) countPill.textContent = safeRows.length + ' records';
+
+    const container = document.getElementById('studentsTable');
+    if (!container) return;
+
+    if (!safeRows.length) {
+      container.innerHTML = '<div class="empty-state">No students matched the current filters.</div>';
+      return;
+    }
+
+    const html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Institute</th>
+            <th>Trade</th>
+            <th>Session</th>
+            <th>Year</th>
+            <th>Mobile</th>
+            <th>Admission</th>
+            <th>Documents</th>
+            <th>Undertaking</th>
+            <th>Due</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${safeRows.map(function(row) {
+            return `
+              <tr>
+                <td>${escapeHtml(row.Student_ID || '')}</td>
+                <td>${escapeHtml(row.Student_Name || '')}</td>
+                <td>${escapeHtml(row.Institute_ID || '')}</td>
+                <td>${escapeHtml(row.Trade || '')}</td>
+                <td>${escapeHtml(row.Session || '')}</td>
+                <td>${escapeHtml(row.Year || '')}</td>
+                <td>${escapeHtml(row.Mobile || '')}</td>
+                <td><span class="pill">${escapeHtml(row.Admission_Status || '')}</span></td>
+                <td>${escapeHtml(row.Document_Status || '')}</td>
+                <td>${escapeHtml(row.Undertaking_Status || '')}</td>
+                <td>${escapeHtml(String(row.Due_Amount || ''))}</td>
+                <td>${row.Undertaking_Link ? '<a class="link-btn" href="' + escapeAttribute(row.Undertaking_Link) + '" target="_blank">Open</a>' : '<span class="muted">NA</span>'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  function getStudentFilters() {
+    const searchEl = document.getElementById('studentSearch');
+    const instituteEl = document.getElementById('filterInstitute');
+    const tradeEl = document.getElementById('filterTrade');
+    const sessionEl = document.getElementById('filterSession');
+    const yearEl = document.getElementById('filterYear');
+    const statusEl = document.getElementById('filterAdmissionStatus');
+
+    return {
+      search: searchEl ? searchEl.value : '',
+      instituteId: instituteEl ? instituteEl.value : '',
+      trade: tradeEl ? tradeEl.value : '',
+      session: sessionEl ? sessionEl.value : '',
+      year: yearEl ? yearEl.value : '',
+      admissionStatus: statusEl ? statusEl.value : ''
+    };
+  }
+
+  function applyStudentFilters() {
+    loadStudents();
+  }
+
+  function resetStudentFilters() {
+    ['studentSearch', 'filterInstitute', 'filterTrade', 'filterSession', 'filterYear', 'filterAdmissionStatus'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    loadStudents();
+  }
+
+  function bindStudentSearch() {
+    const search = document.getElementById('studentSearch');
+    if (!search) return;
+
+    search.addEventListener('input', function() {
+      clearTimeout(studentSearchTimer);
+      studentSearchTimer = setTimeout(loadStudents, 260);
+    });
+  }
+
+  function bindQuickReloads() {
+    ['filterInstitute', 'filterTrade', 'filterYear', 'filterAdmissionStatus'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', loadStudents);
+    });
+
+    const sessionInput = document.getElementById('filterSession');
+    if (sessionInput) {
+      sessionInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          loadStudents();
+        }
+      });
+    }
+  }
+
+  async function saveAdmission() {
+    if (isSavingAdmission) return;
+
+    const form = document.getElementById('admissionForm');
+    const resultBox = document.getElementById('admissionResult');
+    const saveButton = document.getElementById('saveAdmissionBtn');
+    const formData = Object.fromEntries(new FormData(form).entries());
+    const missing = ['Institute_ID', 'Student_Name', 'Trade', 'Session', 'Year', 'Mobile'].filter(function(field) {
+      return !String(formData[field] || '').trim();
+    });
+
+    if (missing.length) {
+      setInlineResult('Please fill required fields: ' + missing.join(', '), 'error');
+      return;
+    }
+
+    isSavingAdmission = true;
+    if (saveButton) saveButton.disabled = true;
+    if (resultBox) setInlineResult('Saving student record...', 'success');
+
+    google.script.run
+      .withSuccessHandler(async function(res) {
+        try {
+          const files = await collectDocumentFiles();
+          const studentId = res.studentId || '';
+          const studentName = formData.Student_Name || '';
+
+          if (files.length && studentId && studentName) {
+            google.script.run
+              .withSuccessHandler(function(uploadRes) {
+                resetAdmissionAfterSave(studentId, (uploadRes.uploaded || []).length);
+              })
+              .withFailureHandler(function(err) {
+                setInlineResult('Student saved, but document upload failed: ' + messageOf(err), 'error');
+                isSavingAdmission = false;
+                if (saveButton) saveButton.disabled = false;
+                loadDashboard();
+                loadStudents();
+              })
+              .saveStudentDocuments(studentId, studentName, files);
+            return;
+          }
+
+          resetAdmissionAfterSave(studentId, 0);
+        } catch (err) {
+          setInlineResult('Saved, but post-save processing failed: ' + messageOf(err), 'error');
+          isSavingAdmission = false;
+          if (saveButton) saveButton.disabled = false;
+        }
+      })
+      .withFailureHandler(function(err) {
+        setInlineResult('Save failed: ' + messageOf(err), 'error');
+        isSavingAdmission = false;
+        if (saveButton) saveButton.disabled = false;
+      })
+      .saveStudent(formData);
+  }
+
+  function resetAdmissionAfterSave(studentId, uploadCount) {
+    const form = document.getElementById('admissionForm');
+    const saveButton = document.getElementById('saveAdmissionBtn');
+    const message = uploadCount
+      ? 'Saved successfully. Student ID: ' + studentId + '. Documents uploaded: ' + uploadCount
+      : 'Saved successfully. Student ID: ' + studentId;
+
+    setInlineResult(message, 'success');
+    if (form) form.reset();
+    isSavingAdmission = false;
+    if (saveButton) saveButton.disabled = false;
+    loadDashboard();
+    loadStudents();
+  }
+
+  async function collectDocumentFiles() {
+    const fileConfigs = [
+      { inputId: 'Photo_File', documentType: 'Photo' },
+      { inputId: 'Aadhaar_File', documentType: 'Aadhaar' },
+      { inputId: 'Caste_File', documentType: 'Caste Certificate' },
+      { inputId: 'Income_File', documentType: 'Income Certificate' }
+    ];
+
+    const results = [];
+
+    for (const config of fileConfigs) {
+      const input = document.getElementById(config.inputId);
+      if (input && input.files && input.files[0]) {
+        results.push(await fileToBase64Object(input.files[0], config.documentType));
+      }
+    }
+
+    return results;
+  }
+
+  function fileToBase64Object(file, documentType) {
+    return new Promise(function(resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const base64Data = String(event.target.result || '').split(',')[1];
+        resolve({
+          documentType: documentType,
+          fileName: file.name,
+          mimeType: file.type,
+          base64Data: base64Data
+        });
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function resetAdmissionForm() {
+    const form = document.getElementById('admissionForm');
+    if (form) form.reset();
+    setInlineResult('', 'success', true);
+  }
+
+  function setInlineResult(message, type, hide) {
+    const box = document.getElementById('admissionResult');
+    if (!box) return;
+
+    if (hide || !message) {
+      box.className = 'status-banner hidden';
+      box.innerHTML = '';
+      return;
+    }
+
+    box.className = 'status-banner ' + (type === 'error' ? 'error' : 'success');
+    box.innerHTML = escapeHtml(message);
+  }
+
+  function showGlobalNotice(message, type, timeout) {
+    const notice = document.getElementById('globalNotice');
+    if (!notice) return;
+
+    notice.className = 'status-banner ' + (type === 'error' ? 'error' : 'success');
+    notice.textContent = message;
+
+    if (timeout) {
+      window.setTimeout(function() {
+        notice.className = 'status-banner hidden';
+        notice.textContent = '';
+      }, timeout);
+    }
+  }
+
+  function fillSelect(id, items, includeBlank, blankLabel) {
+    const select = document.getElementById(id);
+    if (!select) return;
+
+    const firstOption = includeBlank
+      ? '<option value="">Select</option>'
+      : '<option value="">' + escapeHtml(blankLabel || 'All') + '</option>';
+
+    select.innerHTML = firstOption + (items || []).map(function(value) {
+      return '<option value="' + escapeAttribute(String(value)) + '">' + escapeHtml(String(value)) + '</option>';
+    }).join('');
+  }
+
+  function fillSelectFromObjects(id, items, valueKey, labelKey, includeBlank, blankLabel) {
+    const select = document.getElementById(id);
+    if (!select) return;
+
+    const firstOption = includeBlank
+      ? '<option value="">Select</option>'
+      : '<option value="">' + escapeHtml(blankLabel || 'All') + '</option>';
+
+    select.innerHTML = firstOption + (items || []).map(function(item) {
+      const value = String(item[valueKey] || '');
+      const label = String(item[labelKey] || '');
+      return '<option value="' + escapeAttribute(value) + '">' + escapeHtml(label) + '</option>';
+    }).join('');
+  }
+
+  function uniqueValues(values) {
+    return [...new Set((values || []).filter(Boolean))];
+  }
+
+  function messageOf(err) {
+    return err && err.message ? err.message : String(err || 'Unknown error');
+  }
+
+  function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replace(/`/g, '&#096;');
+  }
+
+  window.onload = initApp;
+</script>

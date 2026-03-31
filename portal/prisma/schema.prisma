@@ -1,0 +1,1325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  ADMISSION_STAFF
+  DOCUMENT_VERIFIER
+  SCHOLARSHIP_DESK
+  FINANCE_DESK
+  PRN_SCVT_DESK
+  VIEWER
+}
+
+enum StudentStatus {
+  DRAFT
+  IN_PROGRESS
+  UNDER_REVIEW
+  COMPLETED
+  REJECTED
+}
+
+enum StudentLifecycleStage {
+  ACTIVE
+  PROMOTED
+  ALUMNI
+  ARCHIVED
+}
+
+enum StudentArchiveCategory {
+  SUSPECTED
+  INACTIVE_LEFT
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  INCOMPLETE
+}
+
+enum AdmissionMode {
+  DIRECT
+  AGENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ParentRelation {
+  FATHER
+  MOTHER
+  GUARDIAN
+}
+
+enum EducationLevel {
+  TENTH
+  TWELFTH
+  ITI
+  DIPLOMA
+  GRADUATION
+  OTHER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+enum FeeCollectionMode {
+  DIRECT
+  AGENT
+}
+
+enum FeePayerType {
+  STUDENT
+  AGENT
+}
+
+enum FeeCollectionScope {
+  STUDENT_WISE
+  BULK
+}
+
+enum ScholarshipStatus {
+  NOT_APPLIED
+  APPLIED
+  UNDER_PROCESS
+  QUERY_BY_DEPARTMENT
+  APPROVED
+  REJECTED
+}
+
+enum DocumentOwnerType {
+  STUDENT
+  PARENT
+}
+
+enum DocumentTypeCode {
+  STUDENT_PHOTO
+  STUDENT_AADHAAR
+  PARENT_AADHAAR
+  TENTH_MARKSHEET
+  CASTE_CERTIFICATE
+  INCOME_CERTIFICATE
+  BANK_PASSBOOK
+  SIGNED_UNDERTAKING
+  OTHER
+}
+
+enum AccountEntryType {
+  OPENING_BALANCE
+  EXPENSE
+  INCOME
+  BANK_DEPOSIT
+}
+
+enum HrSalaryType {
+  MONTHLY
+  DAILY_WAGE
+  CONTRACT
+}
+
+enum HrEmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+}
+
+enum HrStaffCategory {
+  TECHNICAL_CTI
+  TECHNICAL_NON_CTI
+  NON_TECHNICAL_TEACHING
+  NON_TEACHING
+}
+
+enum HrQualificationLevel {
+  TENTH
+  TWELFTH
+  ITI
+  DIPLOMA
+  BTECH_BE
+  GRADUATION
+  POST_GRADUATION
+  OTHER
+}
+
+enum AttendancePersonType {
+  STUDENT
+  STAFF
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+}
+
+enum ExamResultStatus {
+  NOT_DECLARED
+  PASS
+  FAIL
+}
+
+enum ExamAppearanceStatus {
+  NOT_APPEARED
+  APPEARED
+}
+
+enum ReappearStatus {
+  NOT_REQUIRED
+  PENDING
+  SCHEDULED
+  COMPLETED
+  NOT_ELIGIBLE
+}
+
+enum NoDuesDepartment {
+  ACCOUNTS
+  WORKSHOP
+  STORE
+  LIBRARY
+  DOCUMENTS
+  ID_CARD
+}
+
+enum InventoryDepartment {
+  STORE
+  WORKSHOP
+}
+
+enum InventoryIssueStatus {
+  ISSUED
+  PARTIAL_RETURNED
+  RETURNED
+}
+
+enum LibraryIssueStatus {
+  ISSUED
+  RETURNED
+}
+
+enum CertificateType {
+  BONAFIDE
+  CHARACTER
+  NO_DUES
+  PRACTICAL_PERMISSION
+  HALL_TICKET
+}
+
+enum EnquiryStatus {
+  NEW
+  FOLLOW_UP
+  VISIT_SCHEDULED
+  COUNSELLED
+  INTERESTED
+  DOCUMENTS_PENDING
+  CONVERTED
+  LOST
+}
+
+enum EnquirySource {
+  WALK_IN
+  CALL
+  AGENT
+  REFERRAL
+  CAMP
+  SOCIAL_MEDIA
+  OTHER
+}
+
+enum CommunicationChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+  CALL
+}
+
+enum CommunicationTargetType {
+  STUDENT
+  PARENT
+  AGENT
+  ENQUIRY
+  STAFF
+}
+
+enum CommunicationLogStatus {
+  DRAFT
+  READY
+  SENT
+  FAILED
+}
+
+enum GrievancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum GrievanceStatus {
+  OPEN
+  IN_REVIEW
+  ACTION_IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum GrievanceTargetType {
+  GENERAL
+  STUDENT
+  STAFF
+}
+
+enum PlacementStatus {
+  INTERESTED
+  APPLIED
+  SELECTED
+  OFFERED
+  JOINED
+  REJECTED
+  NOT_JOINED
+}
+
+enum ApprenticeshipStatus {
+  NOT_STARTED
+  APPLIED
+  UNDER_PROCESS
+  ACTIVE
+  COMPLETED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  name          String
+  email         String     @unique
+  passwordHash  String?
+  fatherName    String?
+  motherName    String?
+  spouseName    String?
+  dateOfBirth   DateTime?  @db.Date
+  gender        Gender?
+  mobile        String?
+  emergencyContact String?
+  designation   String?
+  addressLine   String?
+  photoUrl      String?
+  role          UserRole
+  isActive      Boolean    @default(true)
+  hasCustomModuleAccess Boolean @default(false)
+  allowedModuleSlugs    String[] @default([])
+  hasCustomActionAccess Boolean @default(false)
+  allowedActionKeys     String[] @default([])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  auditLogs     AuditLog[]
+  admissions    Student[]  @relation("AdmissionCreatedBy")
+  accountEntries AccountEntry[]
+  accountDayClosures AccountDayClosure[]
+  vendorBills    VendorBill[]
+  vendorPayments VendorPayment[]
+  hrPayments     HrPayment[]
+  noDuesClearances StudentNoDuesClearance[]
+  certificatePrintLogs CertificatePrintLog[]
+  attendanceRecords AttendanceRecord[]
+  createdTimetableEntries TimetableEntry[]
+  approvedTimetablePublications TimetablePublication[]
+  inventoryIssuesCreated InventoryIssue[] @relation("InventoryIssueCreatedBy")
+  inventoryIssuesReturned InventoryIssue[] @relation("InventoryIssueReturnedBy")
+  libraryIssuesCreated LibraryIssue[] @relation("LibraryIssueCreatedBy")
+  libraryIssuesReturned LibraryIssue[] @relation("LibraryIssueReturnedBy")
+  communicationTemplates CommunicationTemplate[]
+  communicationLogs CommunicationLog[]
+  grievanceCasesCreated GrievanceCase[] @relation("GrievanceCreatedBy")
+  hrLeavesCreated       HrLeaveRecord[] @relation("HrLeaveCreatedBy")
+  hrLeavesApproved      HrLeaveRecord[] @relation("HrLeaveApprovedBy")
+  placementCompaniesCreated PlacementCompany[] @relation("PlacementCompanyCreatedBy")
+  placementRecordsCreated PlacementRecord[] @relation("PlacementRecordCreatedBy")
+}
+
+model Institute {
+  id           String   @id @default(cuid())
+  instituteCode String  @unique
+  name         String
+  scvtCode     String?
+  sidhCode     String?
+  address      String?
+  status       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  trades       Trade[]
+  students     Student[]
+  timetableEntries TimetableEntry[]
+  timetablePublications TimetablePublication[]
+}
+
+model Trade {
+  id             String   @id @default(cuid())
+  instituteId    String
+  tradeCode      String
+  name           String
+  duration       String?
+  ncvtScvt       String?
+  standardFees   Decimal? @db.Decimal(10, 2)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  institute      Institute @relation(fields: [instituteId], references: [id])
+  students       Student[]
+  timetableEntries TimetableEntry[]
+  timetablePublications TimetablePublication[]
+
+  @@unique([instituteId, tradeCode])
+}
+
+model TimetableEntry {
+  id             String   @id @default(cuid())
+  instituteId    String
+  tradeId        String
+  session        String
+  yearLabel      String
+  dayOfWeek      String
+  startTime      String
+  endTime        String
+  subjectTitle   String
+  instructorName String?
+  roomLabel      String?
+  batchLabel     String?
+  isPractical    Boolean  @default(false)
+  note           String?
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  institute      Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  trade          Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  createdBy      User?     @relation(fields: [createdById], references: [id])
+
+  @@index([instituteId, tradeId, session, yearLabel, dayOfWeek])
+}
+
+model TimetablePublication {
+  id           String   @id @default(cuid())
+  instituteId  String
+  tradeId      String
+  session      String
+  yearLabel    String
+  isLocked     Boolean  @default(false)
+  approvedById String?
+  approvedAt   DateTime?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  institute    Institute @relation(fields: [instituteId], references: [id], onDelete: Cascade)
+  trade        Trade     @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  approvedBy   User?     @relation(fields: [approvedById], references: [id])
+
+  @@unique([instituteId, tradeId, session, yearLabel])
+}
+
+model Agent {
+  id                String   @id @default(cuid())
+  agentCode         String   @unique
+  name              String
+  mobile            String?
+  defaultAgreement  String?
+  defaultValue      Decimal? @db.Decimal(10, 2)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  students          Student[]
+  feeTransactions   FeeTransaction[]
+  collections       AgentCollection[]
+}
+
+model Enquiry {
+  id                   String        @id @default(cuid())
+  fullName             String
+  mobile               String
+  parentMobile         String?
+  instituteCode        String?
+  tradeId              String?
+  qualification        String?
+  category             String?
+  address              String?
+  source               EnquirySource @default(WALK_IN)
+  enquiryDate          DateTime      @db.Date
+  status               EnquiryStatus @default(NEW)
+  nextFollowUpDate     DateTime?     @db.Date
+  lastContactDate      DateTime?     @db.Date
+  assignedCounsellor   String?
+  budgetConcern        String?
+  scholarshipInterest  Boolean       @default(false)
+  admissionMode        AdmissionMode?
+  agentName            String?
+  notes                String?
+  followUpNotes        String?
+  lostReason           String?
+  convertedAt          DateTime?
+  convertedStudentId   String?
+  convertedStudentCode String?
+  createdById          String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@index([status, enquiryDate])
+  @@index([mobile, fullName])
+}
+
+model HrStaff {
+  id                String             @id @default(cuid())
+  employeeCode      String             @unique
+  fullName          String
+  fatherName        String?
+  motherName        String?
+  spouseName        String?
+  dateOfBirth       DateTime?          @db.Date
+  joiningDate       DateTime?          @db.Date
+  designation       String?
+  department        String?
+  staffCategory     HrStaffCategory    @default(NON_TEACHING)
+  academicQualification String?
+  academicSpecialization String?
+  academicPassingYear Int?
+  technicalQualification String?
+  technicalSpecialization String?
+  technicalPassingYear Int?
+  isCtiHolder       Boolean            @default(false)
+  ctiPassingYear    Int?
+  ctiTrade          String?
+  ctiInstituteName  String?
+  ctiPercentage     Decimal?           @db.Decimal(5, 2)
+  ctiDocumentUrl    String?
+  ctiDocumentName   String?
+  salaryType        HrSalaryType       @default(MONTHLY)
+  monthlySalary     Decimal?           @db.Decimal(12, 2)
+  mobile            String?
+  alternateMobile   String?
+  email             String?
+  aadhaarNo         String?
+  panNo             String?
+  aadhaarDocumentUrl String?
+  aadhaarDocumentName String?
+  panDocumentUrl    String?
+  panDocumentName   String?
+  bankName          String?
+  accountNumber     String?
+  ifscCode          String?
+  addressLine       String?
+  photoUrl          String?
+  isGovtRecordOnly  Boolean            @default(false)
+  isExperienceCase  Boolean            @default(false)
+  experienceFromDate DateTime?         @db.Date
+  experienceToDate   DateTime?         @db.Date
+  agreementEndDate   DateTime?         @db.Date
+  agreedMonthlyAmount Decimal?         @db.Decimal(12, 2)
+  experienceNote    String?
+  employmentStatus  HrEmploymentStatus @default(ACTIVE)
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  payments          HrPayment[]
+  qualifications    HrQualification[]
+  leaveRecords      HrLeaveRecord[]
+  attendanceRecords AttendanceRecord[] @relation("StaffAttendance")
+  grievanceCases    GrievanceCase[]
+}
+
+model HrQualification {
+  id                String              @id @default(cuid())
+  staffId           String
+  level             HrQualificationLevel
+  specialization    String?
+  boardUniversity   String?
+  passingYear       Int?
+  percentage        Decimal?           @db.Decimal(5, 2)
+  documentUrl       String?
+  documentName      String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  staff             HrStaff            @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId, level])
+}
+
+model HrPayment {
+  id                String    @id @default(cuid())
+  staffId           String
+  paymentMonth      String?
+  paymentDate       DateTime
+  grossAmount       Decimal   @db.Decimal(12, 2)
+  deductionsAmount  Decimal   @default(0) @db.Decimal(12, 2)
+  netAmount         Decimal   @db.Decimal(12, 2)
+  paymentMode       String
+  referenceNo       String?
+  note              String?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+
+  staff             HrStaff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  createdBy         User?     @relation(fields: [createdById], references: [id])
+
+  @@index([staffId, paymentDate])
+  @@index([paymentMonth, paymentDate])
+}
+
+model HrLeaveRecord {
+  id             String    @id @default(cuid())
+  staffId        String
+  leaveType      String
+  status         String    @default("PENDING")
+  fromDate       DateTime  @db.Date
+  toDate         DateTime  @db.Date
+  totalDays      Decimal   @default(1) @db.Decimal(6, 2)
+  reason         String?
+  approvalNote   String?
+  approvedById   String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  staff          HrStaff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  approvedBy     User?     @relation("HrLeaveApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdBy      User?     @relation("HrLeaveCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([staffId, fromDate, toDate])
+  @@index([status, leaveType, createdAt])
+}
+
+model AccountEntry {
+  id            String           @id @default(cuid())
+  entryType     AccountEntryType
+  category      String
+  head          String?
+  subHead       String?
+  partyName     String?
+  studentId     String?
+  feeTransactionId String?       @unique
+  amount        Decimal          @db.Decimal(12, 2)
+  paymentMode   String
+  referenceNo   String?
+  note          String?
+  entryDate     DateTime
+  createdById   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  createdBy     User?            @relation(fields: [createdById], references: [id])
+  student       Student?         @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  vendorPayment VendorPayment?
+
+  @@index([entryType, entryDate])
+  @@index([category, entryDate])
+}
+
+model AccountDayClosure {
+  id             String    @id @default(cuid())
+  closedDate     DateTime  @unique
+  openingBalance Decimal   @default(0) @db.Decimal(12, 2)
+  closingBalance Decimal   @default(0) @db.Decimal(12, 2)
+  note           String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  createdBy      User?     @relation(fields: [createdById], references: [id])
+}
+
+model VendorBill {
+  id                  String         @id @default(cuid())
+  vendorName          String
+  materialDescription String?
+  billDate            DateTime
+  referenceNo         String?
+  note                String?
+  totalAmount         Decimal        @db.Decimal(12, 2)
+  paidAmount          Decimal        @default(0) @db.Decimal(12, 2)
+  dueAmount           Decimal        @default(0) @db.Decimal(12, 2)
+  paymentStatus       PaymentStatus  @default(UNPAID)
+  createdById         String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  createdBy           User?          @relation(fields: [createdById], references: [id])
+  payments            VendorPayment[]
+
+  @@index([vendorName, billDate])
+}
+
+model VendorPayment {
+  id             String      @id @default(cuid())
+  vendorBillId   String
+  accountEntryId String?     @unique
+  paymentDate    DateTime
+  amountPaid     Decimal     @db.Decimal(12, 2)
+  paymentMode    String
+  referenceNo    String?
+  note           String?
+  createdById    String?
+  createdAt      DateTime    @default(now())
+
+  vendorBill     VendorBill  @relation(fields: [vendorBillId], references: [id], onDelete: Cascade)
+  accountEntry   AccountEntry? @relation(fields: [accountEntryId], references: [id], onDelete: SetNull)
+  createdBy      User?       @relation(fields: [createdById], references: [id])
+
+  @@index([vendorBillId, paymentDate])
+}
+
+model Student {
+  id                      String                @id @default(cuid())
+  studentCode             String                @unique
+  admissionNumber         String?
+  enrollmentNumber        String?
+  instituteId             String
+  tradeId                 String
+  unitNumber              Int?
+  agentId                 String?
+  createdById             String?
+  admissionMode           AdmissionMode         @default(DIRECT)
+  session                 String
+  yearLabel               String
+  paymentMode             String?
+  status                  StudentStatus         @default(IN_PROGRESS)
+  lifecycleStage          StudentLifecycleStage @default(ACTIVE)
+  fullName                String
+  dateOfBirth             DateTime?             @db.Date
+  mobile                  String
+  alternateMobile         String?
+  email                   String?
+  gender                  Gender?
+  category                String?
+  caste                   String?
+  religion                String?
+  country                 String?
+  stateName               String?
+  district                String?
+  tehsil                  String?
+  block                   String?
+  ward                    String?
+  areaVillage             String?
+  address                 String?
+  fatherName              String?
+  motherName              String?
+  incomeDetails           String?
+  domicileDetails         String?
+  minorityStatus          Boolean               @default(false)
+  disabilityStatus        Boolean               @default(false)
+  maritalStatus           String?
+  signatureUrl            String?
+  admissionDate           DateTime?             @db.Date
+  admissionType           String?
+  admissionStatusLabel    String?
+  seatType                String?
+  rollNumber              String?
+  batchLabel              String?
+  shiftLabel              String?
+  aadhaarMasked           String?
+  aadhaarEncrypted        String?
+  admissionFormStatus     VerificationStatus    @default(PENDING)
+  documentsStatus         VerificationStatus    @default(PENDING)
+  undertakingStatus       VerificationStatus    @default(PENDING)
+  eligibilityStatus       VerificationStatus    @default(PENDING)
+  completionDate          DateTime?
+  promotedAt              DateTime?
+  alumniAt                DateTime?
+  archivedAt              DateTime?
+  archiveCategory         StudentArchiveCategory?
+  archiveNote             String?
+  internalNotes           String?
+  deletedAt               DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  institute               Institute             @relation(fields: [instituteId], references: [id])
+  trade                   Trade                 @relation(fields: [tradeId], references: [id])
+  agent                   Agent?                @relation(fields: [agentId], references: [id])
+  createdBy               User?                 @relation("AdmissionCreatedBy", fields: [createdById], references: [id])
+
+  parents                 ParentIdentity[]
+  educationRecords        EducationQualification[]
+  documents               StudentDocument[]
+  feeProfile              FeeProfile?
+  feeTransactions         FeeTransaction[]
+  agentCollectionAllocations AgentCollectionAllocation[]
+  accountEntries          AccountEntry[]
+  scholarshipRecord       ScholarshipRecord?
+  prnScvtRecord           PrnScvtRecord?
+  examStatusRecord        ExamStatusRecord?
+  undertakingRecord       UndertakingRecord?
+  noDuesClearances        StudentNoDuesClearance[]
+  certificatePrintLogs    CertificatePrintLog[]
+  verificationNotes       VerificationNote[]
+  auditLogs               AuditLog[]
+  attendanceRecords       AttendanceRecord[]    @relation("StudentAttendance")
+  inventoryIssues         InventoryIssue[]
+  libraryIssues           LibraryIssue[]
+  grievanceCases          GrievanceCase[]
+  placementRecords        PlacementRecord[]
+
+  @@index([fullName, mobile])
+  @@index([session, yearLabel, status])
+  @@index([session, status])
+  @@index([session, documentsStatus])
+  @@index([session, eligibilityStatus])
+}
+
+model StudentNoDuesClearance {
+  id            String            @id @default(cuid())
+  studentId     String
+  department    NoDuesDepartment
+  isCleared     Boolean           @default(false)
+  clearanceDate DateTime?         @db.Date
+  remark        String?
+  approvedById  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  student       Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  approvedBy    User?             @relation(fields: [approvedById], references: [id])
+
+  @@unique([studentId, department])
+  @@index([department, isCleared])
+}
+
+model InventoryItem {
+  id             String              @id @default(cuid())
+  itemCode       String              @unique
+  itemName       String
+  department     InventoryDepartment
+  unitLabel      String              @default("pcs")
+  currentStock   Decimal             @default(0) @db.Decimal(12, 2)
+  reorderLevel   Decimal             @default(0) @db.Decimal(12, 2)
+  storageLocation String?
+  note           String?
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  issues         InventoryIssue[]
+
+  @@index([department, isActive])
+  @@index([itemName])
+}
+
+model InventoryIssue {
+  id               String               @id @default(cuid())
+  itemId           String
+  studentId        String
+  quantityIssued   Decimal              @db.Decimal(12, 2)
+  quantityReturned Decimal              @default(0) @db.Decimal(12, 2)
+  issueDate        DateTime             @db.Date
+  expectedReturnDate DateTime?          @db.Date
+  lastReturnDate   DateTime?            @db.Date
+  status           InventoryIssueStatus @default(ISSUED)
+  remark           String?
+  issuedById       String?
+  returnedById     String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  item             InventoryItem        @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  student          Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  issuedBy         User?                @relation("InventoryIssueCreatedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  returnedBy       User?                @relation("InventoryIssueReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status])
+  @@index([itemId, status])
+  @@index([issueDate, status])
+}
+
+model LibraryBook {
+  id                String    @id @default(cuid())
+  accessionNumber   String    @unique
+  title             String
+  authorName        String?
+  category          String?
+  publisherName     String?
+  editionLabel      String?
+  totalCopies       Int       @default(1)
+  availableCopies   Int       @default(1)
+  shelfLocation     String?
+  note              String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  issues            LibraryIssue[]
+
+  @@index([title])
+  @@index([category, isActive])
+}
+
+model LibraryIssue {
+  id                String             @id @default(cuid())
+  bookId            String
+  studentId         String
+  issueDate         DateTime           @db.Date
+  expectedReturnDate DateTime?         @db.Date
+  returnDate        DateTime?          @db.Date
+  status            LibraryIssueStatus @default(ISSUED)
+  remark            String?
+  issuedById        String?
+  returnedById      String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  book              LibraryBook        @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  student           Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  issuedBy          User?              @relation("LibraryIssueCreatedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  returnedBy        User?              @relation("LibraryIssueReturnedBy", fields: [returnedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status])
+  @@index([bookId, status])
+  @@index([issueDate, status])
+}
+
+model CertificatePrintLog {
+  id                String          @id @default(cuid())
+  studentId         String
+  certificateType   CertificateType
+  certificateNumber String          @unique
+  verificationCode  String          @unique @default(cuid())
+  printCount        Int             @default(1)
+  lastPrintedAt     DateTime?
+  issueDate         DateTime        @default(now())
+  note              String?
+  issuedById        String?
+  createdAt         DateTime        @default(now())
+
+  student           Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  issuedBy          User?           @relation(fields: [issuedById], references: [id])
+
+  @@index([studentId, certificateType, issueDate])
+}
+
+model ParentIdentity {
+  id                 String          @id @default(cuid())
+  studentId          String
+  relation           ParentRelation
+  name               String
+  mobile             String?
+  aadhaarMasked      String?
+  aadhaarEncrypted   String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  student            Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  documents          StudentDocument[]
+}
+
+model EducationQualification {
+  id                   String             @id @default(cuid())
+  studentId            String
+  level                EducationLevel
+  boardUniversity      String?
+  schoolName           String?
+  certificateNumber    String?
+  rollNumber           String?
+  passingYear          Int?
+  percentage           Decimal?           @db.Decimal(5, 2)
+  isPassed             Boolean            @default(false)
+  minimumEligibility   Boolean            @default(false)
+  verificationStatus   VerificationStatus @default(PENDING)
+  verifierRemarks      String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  student              Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, level])
+}
+
+model StudentDocument {
+  id                   String             @id @default(cuid())
+  studentId            String
+  parentIdentityId     String?
+  ownerType            DocumentOwnerType
+  documentType         DocumentTypeCode
+  originalName         String
+  fileUrl              String
+  storageProvider      String
+  mimeType             String?
+  fileSizeKb           Int?
+  verificationStatus   VerificationStatus @default(PENDING)
+  verifiedById         String?
+  verifiedAt           DateTime?
+  remarks              String?
+  deletedAt            DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  student              Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parentIdentity       ParentIdentity?    @relation(fields: [parentIdentityId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, documentType])
+  @@index([deletedAt, verificationStatus])
+  @@index([createdAt])
+}
+
+model FeeProfile {
+  id                       String         @id @default(cuid())
+  studentId                String         @unique
+  collectionMode           FeeCollectionMode @default(DIRECT)
+  instituteDecidedFee      Decimal?       @db.Decimal(10, 2)
+  feesIfScholarship        Decimal?       @db.Decimal(10, 2)
+  feesIfNoScholarship      Decimal?       @db.Decimal(10, 2)
+  agentCommittedFee        Decimal?       @db.Decimal(10, 2)
+  scholarshipApplied       Boolean        @default(false)
+  convertedFromAgent       Boolean        @default(false)
+  conversionDate           DateTime?
+  conversionReason         String?
+  reminderCount            Int            @default(0)
+  lastReminderDate         DateTime?
+  finalFees                Decimal        @db.Decimal(10, 2)
+  paidAmount               Decimal        @default(0) @db.Decimal(10, 2)
+  dueAmount                Decimal        @default(0) @db.Decimal(10, 2)
+  paymentStatus            PaymentStatus  @default(UNPAID)
+  practicalExamEligible    Boolean        @default(false)
+  adminOverride            Boolean        @default(false)
+  finalStatus              String?
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+
+  student                  Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentStatus])
+  @@index([dueAmount])
+}
+
+model FeeTransaction {
+  id                String    @id @default(cuid())
+  studentId         String
+  agentId           String?
+  receiptNumber     String?   @unique
+  transactionDate   DateTime
+  amountPaid        Decimal   @db.Decimal(10, 2)
+  payerType         FeePayerType @default(STUDENT)
+  collectionScope   FeeCollectionScope @default(STUDENT_WISE)
+  paymentMode       String
+  allocationGroup   String?
+  referenceNo       String?
+  remark            String?
+  createdAt         DateTime  @default(now())
+
+  student           Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  agent             Agent?    @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, transactionDate])
+}
+
+model AgentCollection {
+  id                String    @id @default(cuid())
+  agentId           String
+  collectionDate    DateTime
+  totalAmount       Decimal   @db.Decimal(10, 2)
+  allocatedAmount   Decimal   @default(0) @db.Decimal(10, 2)
+  unallocatedAmount Decimal   @default(0) @db.Decimal(10, 2)
+  paymentMode       String
+  referenceNo       String?
+  remark            String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  agent             Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  allocations       AgentCollectionAllocation[]
+
+  @@index([agentId, collectionDate])
+}
+
+model AgentCollectionAllocation {
+  id                String    @id @default(cuid())
+  agentCollectionId String
+  studentId         String
+  amountAllocated   Decimal   @db.Decimal(10, 2)
+  createdAt         DateTime  @default(now())
+
+  agentCollection   AgentCollection @relation(fields: [agentCollectionId], references: [id], onDelete: Cascade)
+  student           Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([agentCollectionId, studentId])
+}
+
+model ScholarshipRecord {
+  id                      String             @id @default(cuid())
+  studentId               String             @unique
+  scholarshipId           String?
+  incomeCertificateNumber String?
+  status                  ScholarshipStatus  @default(NOT_APPLIED)
+  queryText               String?
+  querySubmissionDate     DateTime?
+  approvedDate            DateTime?
+  creditedAmount          Decimal?           @db.Decimal(10, 2)
+  creditDate              DateTime?
+  incomeCertificateOk     Boolean            @default(false)
+  bankVerified            Boolean            @default(false)
+  aadhaarVerified         Boolean            @default(false)
+  casteCertificateOk      Boolean            @default(false)
+  updatedAt               DateTime           @updatedAt
+  createdAt               DateTime           @default(now())
+
+  student                 Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model PrnScvtRecord {
+  id                      String             @id @default(cuid())
+  studentId               String             @unique
+  entRollNumber           String?
+  admissionStatus         String?
+  prnNumber               String?
+  scvtRegistrationNumber  String?
+  uploadDate              DateTime?
+  verificationStatus      VerificationStatus @default(PENDING)
+  remark                  String?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  student                 Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([verificationStatus])
+  @@index([scvtRegistrationNumber])
+  @@index([prnNumber])
+}
+
+model ExamStatusRecord {
+  id                        String               @id @default(cuid())
+  studentId                 String               @unique
+  examFeePaid               Boolean              @default(false)
+  hallTicketIssuedOn        DateTime?            @db.Date
+  tradePracticalResult      ExamResultStatus     @default(NOT_DECLARED)
+  onlineTheoryResult        ExamResultStatus     @default(NOT_DECLARED)
+  practicalExamAppearance   ExamAppearanceStatus @default(NOT_APPEARED)
+  practicalAttemptCount     Int                  @default(0)
+  theoryAttemptCount        Int                  @default(0)
+  nextPracticalAttemptDate  DateTime?            @db.Date
+  nextTheoryAttemptDate     DateTime?            @db.Date
+  practicalReappearStatus   ReappearStatus       @default(NOT_REQUIRED)
+  theoryReappearStatus      ReappearStatus       @default(NOT_REQUIRED)
+  practicalEligibleReappear Boolean              @default(true)
+  theoryEligibleReappear    Boolean              @default(true)
+  adminOverrideReason       String?
+  resultPublished           Boolean              @default(false)
+  resultDeclaredOn          DateTime?            @db.Date
+  remark                    String?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+
+  student                   Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([practicalExamAppearance])
+  @@index([tradePracticalResult, practicalEligibleReappear])
+  @@index([onlineTheoryResult, theoryEligibleReappear])
+  @@index([examFeePaid])
+  @@index([resultPublished])
+}
+
+model AttendanceRecord {
+  id          String               @id @default(cuid())
+  personType  AttendancePersonType
+  studentId   String?
+  staffId     String?
+  recordDate  DateTime             @db.Date
+  status      AttendanceStatus     @default(PRESENT)
+  checkInAt   DateTime?
+  checkOutAt  DateTime?
+  note        String?
+  createdById String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  student     Student?             @relation("StudentAttendance", fields: [studentId], references: [id], onDelete: Cascade)
+  staff       HrStaff?             @relation("StaffAttendance", fields: [staffId], references: [id], onDelete: Cascade)
+  createdBy   User?                @relation(fields: [createdById], references: [id])
+
+  @@index([recordDate, personType])
+  @@unique([studentId, recordDate])
+  @@unique([staffId, recordDate])
+}
+
+model UndertakingRecord {
+  id                      String             @id @default(cuid())
+  studentId               String             @unique
+  verificationCode        String             @unique @default(cuid())
+  templateDocumentId      String?
+  generatedUrl            String?
+  generationStatus        VerificationStatus @default(PENDING)
+  generatedOn             DateTime?
+  printCount              Int                @default(0)
+  signedDocumentUrl       String?
+  signedDocumentHash      String?
+  signedStatus            VerificationStatus @default(PENDING)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  student                 Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([generationStatus])
+  @@index([signedStatus])
+  @@index([signedDocumentUrl, signedStatus])
+  @@index([printCount])
+}
+
+model VerificationNote {
+  id                String             @id @default(cuid())
+  studentId         String
+  module            String
+  status            VerificationStatus
+  remarks           String
+  createdAt         DateTime           @default(now())
+
+  student           Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id                String    @id @default(cuid())
+  userId            String?
+  studentId         String?
+  action            String
+  module            String
+  metadataJson      String?
+  createdAt         DateTime  @default(now())
+
+  user              User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  student           Student?  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([module, createdAt])
+}
+
+model CommunicationTemplate {
+  id              String               @id @default(cuid())
+  title           String
+  category        String
+  channel         CommunicationChannel
+  subjectLine     String?
+  bodyText        String
+  isActive        Boolean              @default(true)
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  createdBy       User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  logs            CommunicationLog[]
+
+  @@index([category, channel, isActive])
+}
+
+model CommunicationLog {
+  id              String               @id @default(cuid())
+  templateId      String?
+  channel         CommunicationChannel
+  targetType      CommunicationTargetType
+  targetId        String?
+  targetName      String
+  targetMobile    String?
+  targetEmail     String?
+  subjectLine     String?
+  bodyText        String
+  status          CommunicationLogStatus @default(DRAFT)
+  note            String?
+  createdById     String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  template        CommunicationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy       User?                @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([channel, status, createdAt])
+  @@index([targetType, targetId])
+}
+
+model GrievanceCase {
+  id               String              @id @default(cuid())
+  grievanceNo      String              @unique
+  targetType       GrievanceTargetType @default(GENERAL)
+  studentId        String?
+  staffId          String?
+  category         String
+  title            String
+  description      String
+  priority         GrievancePriority   @default(MEDIUM)
+  status           GrievanceStatus     @default(OPEN)
+  reportedByName   String?
+  reportedByMobile String?
+  assignedToName   String?
+  actionTaken      String?
+  resolutionNote   String?
+  resolvedAt       DateTime?
+  createdById      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  student          Student?            @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  staff            HrStaff?            @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  createdBy        User?               @relation("GrievanceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, priority, createdAt])
+  @@index([targetType, studentId, staffId])
+}
+
+model PlacementCompany {
+  id                 String    @id @default(cuid())
+  companyCode        String    @unique
+  companyName        String
+  contactPerson      String?
+  mobile             String?
+  email              String?
+  addressLine        String?
+  industryType       String?
+  note               String?
+  isActive           Boolean   @default(true)
+  createdById        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  createdBy          User?     @relation("PlacementCompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  placementRecords   PlacementRecord[]
+
+  @@index([companyName, isActive])
+}
+
+model PlacementRecord {
+  id                    String               @id @default(cuid())
+  studentId             String
+  companyId             String?
+  employerName          String
+  designation           String?
+  locationName          String?
+  salaryOffered         Decimal?             @db.Decimal(12, 2)
+  placementStatus       PlacementStatus      @default(INTERESTED)
+  apprenticeshipStatus  ApprenticeshipStatus @default(NOT_STARTED)
+  offerDate             DateTime?            @db.Date
+  joiningDate           DateTime?            @db.Date
+  completionDate        DateTime?            @db.Date
+  note                  String?
+  createdById           String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  student               Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  company               PlacementCompany?    @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  createdBy             User?                @relation("PlacementRecordCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([placementStatus, apprenticeshipStatus, createdAt])
+  @@index([studentId, companyId])
+}

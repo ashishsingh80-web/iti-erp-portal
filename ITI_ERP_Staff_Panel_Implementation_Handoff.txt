@@ -1,0 +1,1158 @@
+ITI ERP + Staff Panel Implementation Handoff
+Google Sheets + Apps Script Complete implementation plan, current status, sheet fixes, and final scripts
+
+Current app status
+Admission form working, student page working, filters working.
+Known open issue
+Dashboard counts depend on ADMISSION_DESK mirror/status flow and may show 0 until sheet formulas are fixed.
+Primary datastore
+Google Sheet: STUDENTS_MASTER as source of truth.
+Web stack
+Google Apps Script + HTML service pages.
+1. Implementation plan
+1.1 Recommended execution order
+Clean STUDENTS_MASTER: remove bad repeated rows, remove validation from Student_ID column A:A, verify formulas are still spilling.
+Fix ADMISSION_DESK formulas so it mirrors open-ended ranges from STUDENTS_MASTER.
+Replace Code.gs with the final version in this handoff.
+Replace Scripts.html with the final stable version in this handoff.
+Update Students.html filter buttons to use Apply Filters and Clear Filters.
+Save Apps Script, create a new deployment, hard refresh browser, then retest admission save, filters, and dashboard.
+1.2 Test checklist
+Create one fresh student from the web app.
+Confirm Student_ID is generated automatically by sheet formula.
+Confirm record appears in Students page after refresh.
+Apply Institute / Trade / Search filters and confirm results change correctly.
+Upload at least one document and confirm it lands in the correct Drive folder.
+Confirm ADMISSION_DESK starts mirroring rows.
+Confirm dashboard counts become meaningful after ADMISSION_DESK/status formulas are fixed.
+2. What has been implemented
+Safe save logic: no full-row appendRow() into STUDENTS_MASTER.
+Manual-field-only writes to preserve formula columns like Student_ID, Final_Fees, Due_Amount, and status formulas.
+LockService-based row allocation to reduce concurrent save collisions.
+Filtered student reads so only valid rows show in the student page.
+Student search and filter wiring fixed in Scripts.html.
+Document upload flow kept separate after student save.
+Safer frontend error handling added so page-load failures surface on-screen instead of silently showing blank areas.
+3. Important sheet changes
+3.1 STUDENTS_MASTER
+Delete any broken repeated rows that were created by earlier bad saves.
+Remove data validation from column A:A (Student_ID) because it is formula-generated.
+Keep formula columns untouched by the app.
+3.2 ADMISSION_DESK headers and mapping
+Confirmed ADMISSION_DESK headers:
+Entry_Date
+Student_Name
+Mobile
+Trade
+Institute_ID
+Session
+Year
+Document_Status
+Undertaking_Status
+Admission_Status
+Student_ID
+Generated_Undertaking_Link
+Use the following formulas in ADMISSION_DESK row 2 after clearing A2:L:
+Cell
+Formula
+A2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",""))
+B2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!C2:C))
+C2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!G2:G))
+D2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!D2:D))
+E2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!B2:B))
+F2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!E2:E))
+G2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!F2:F))
+H2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!AY2:AY))
+I2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!AZ2:AZ))
+J2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!BA2:BA))
+K2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!A2:A))
+L2
+=ARRAYFORMULA(IF(STUDENTS_MASTER!B2:B="","",STUDENTS_MASTER!AT2:AT))
+4. Final Code.gs
+const SHEETS = {
+  students: 'STUDENTS_MASTER',
+  institutes: 'INSTITUTE_MASTER',
+  trades: 'TRADE_MASTER',
+  agents: 'AGENTS_MASTER',
+  admissionDesk: 'ADMISSION_DESK'
+};
+
+const CONFIG_DOCS = {
+  rootFolderId: '1d-tTL7oQaOf20WoAdBTUyLEL3yJ1IPMu'
+};
+
+const STUDENT_MANUAL_FIELDS = [
+  'Institute_ID',
+  'Student_Name',
+  'Trade',
+  'Session',
+  'Year',
+  'Mobile',
+  'Father_Name',
+  'Mother_Name',
+  'Gender',
+  'Category',
+  'Address',
+  'Email_ID',
+  'Photo_Available',
+  'Aadhaar_No',
+  'Caste_Certificate_Available',
+  'Income_Certificate_Available',
+  'Bank_Account_No',
+  'IFSC_Code',
+  'Bank_Name',
+  'Agent_ID',
+  'Payment_Mode',
+  'Agent_Agreement_Status',
+  'Agreement_Effective_Date',
+  'Agreement_Revision_No',
+  'PRN_Number',
+  'SCVTUP_Registration_No',
+  'Scholarship_Application_Status',
+  'Scholarship_ID',
+  'Scholarship_Query_Text',
+  'Query_Submission_Date',
+  'Scholarship_Approved_Date',
+  'Scholarship_Credited_Amount',
+  'Scholarship_Credit_Date',
+  'Fees_If_Scholarship',
+  'Fees_If_No_Scholarship',
+  'Practical_Exam_Admin_Override',
+  'Undertaking_Generated_URL',
+  'Undertaking_Generation_Status',
+  'Undertaking_Generated_On',
+  'Undertaking_Print_Count',
+  'Admission_Form_Status',
+  'Documents_Verified_Status',
+  'Undertaking_Signed_Status',
+  'Completed_By',
+  'Completion_Date'
+];
+
+const STUDENT_REQUIRED_FIELDS = [
+  'Institute_ID',
+  'Student_Name',
+  'Trade',
+  'Session',
+  'Year',
+  'Mobile'
+];
+
+function doGet() {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('ITI Staff Panel')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function getSheet_(name) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sheet) throw new Error('Sheet not found: ' + name);
+  return sheet;
+}
+
+function getHeaders_(sheetName) {
+  const sheet = getSheet_(sheetName);
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+}
+
+function getHeaderMapFromHeaders_(headers) {
+  const map = {};
+  headers.forEach((header, index) => {
+    const key = String(header || '').trim();
+    if (key) map[key] = index + 1;
+  });
+  return map;
+}
+
+function getRowsAsObjects_(sheetName) {
+  const sheet = getSheet_(sheetName);
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+
+  if (lastRow < 2 || lastCol < 1) return [];
+
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+  return values.map((row, idx) => {
+    const obj = {};
+    headers.forEach((h, i) => {
+      obj[h] = row[i];
+    });
+    obj.__rowNumber = idx + 2;
+    return obj;
+  });
+}
+
+function getStudentCacheKey_() {
+  return 'iti_students_cache_v2';
+}
+
+function clearStudentCache_() {
+  CacheService.getScriptCache().remove(getStudentCacheKey_());
+}
+
+function getValidStudents_() {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = getStudentCacheKey_();
+  const cached = cache.get(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  const rows = getRowsAsObjects_(SHEETS.students).filter(r => {
+    return String(r.Institute_ID || '').trim() !== '' &&
+           String(r.Student_Name || '').trim() !== '' &&
+           String(r.Trade || '').trim() !== '';
+  });
+
+  cache.put(cacheKey, JSON.stringify(rows), 120);
+  return rows;
+}
+
+function getDashboardData() {
+  try {
+    const students = getValidStudents_();
+
+    const totalStudents = students.length;
+
+    const pendingAdmissions = students.filter(r => {
+      const v = String(r.Admission_Completion_Status || r.Admission_Status || '').trim();
+      return v === 'Pending' || v === 'In Progress' || v === 'Not Started' || v === '';
+    }).length;
+
+    const documentsPending = students.filter(r => {
+      const v = String(r.Documents_Verified_Status || '').trim();
+      return v === 'Pending' || v === 'Incomplete' || v === '';
+    }).length;
+
+    const undertakingsPending = students.filter(r => {
+      const v = String(r.Undertaking_Signed_Status || '').trim();
+      return v === 'Pending' || v === '';
+    }).length;
+
+    const prnPending = students.filter(r =>
+      String(r.PRN_Number || '').trim() === ''
+    ).length;
+
+    const scvtPending = students.filter(r =>
+      String(r.SCVTUP_Registration_No || '').trim() === ''
+    ).length;
+
+    const scholarshipQueries = students.filter(r =>
+      String(r.Scholarship_Application_Status || '').trim() === 'Query by Deptt.'
+    ).length;
+
+    const dueStudents = students.filter(r =>
+      Number(r.Due_Amount || 0) > 0
+    ).length;
+
+    return {
+      cards: {
+        totalStudents: totalStudents || 0,
+        pendingAdmissions: pendingAdmissions || 0,
+        documentsPending: documentsPending || 0,
+        undertakingsPending: undertakingsPending || 0,
+        prnPending: prnPending || 0,
+        scvtPending: scvtPending || 0,
+        scholarshipQueries: scholarshipQueries || 0,
+        dueStudents: dueStudents || 0
+      },
+      recentAdmissions: students.slice(-10).reverse().map(r => ({
+        date: r.Undertaking_Generated_On || r.Completion_Date || '',
+        studentName: r.Student_Name || '',
+        trade: r.Trade || '',
+        institute: r.Institute_ID || '',
+        admissionStatus: r.Admission_Completion_Status || r.Admission_Status || ''
+      })),
+      pendingWork: students
+        .filter(r => {
+          const v = String(r.Admission_Completion_Status || r.Admission_Status || '').trim();
+          return v === 'Pending' || v === 'In Progress' || v === 'Not Started' || v === '';
+        })
+        .slice(0, 20)
+        .map(r => ({
+          studentName: r.Student_Name || '',
+          missingStep: getMissingStep_(r),
+          responsibleTeam: getResponsibleTeam_(r)
+        })),
+      dueList: students
+        .filter(r => Number(r.Due_Amount || 0) > 0)
+        .slice(0, 20)
+        .map(r => ({
+          studentName: r.Student_Name || '',
+          finalFees: r.Final_Fees || 0,
+          paid: r.Paid_Amount || 0,
+          due: r.Due_Amount || 0
+        }))
+    };
+  } catch (err) {
+    throw new Error('getDashboardData failed: ' + err.message);
+  }
+}
+
+function getMissingStep_(r) {
+  if (String(r.Admission_Form_Status || '').trim() !== 'Completed') return 'Admission Form';
+  if (String(r.Documents_Verified_Status || '').trim() !== 'Verified') return 'Document Verification';
+  if (String(r.Undertaking_Signed_Status || '').trim() === 'Pending' || String(r.Undertaking_Signed_Status || '').trim() === '') return 'Undertaking Signature';
+  if (!String(r.PRN_Number || '').trim()) return 'PRN Pending';
+  if (!String(r.SCVTUP_Registration_No || '').trim()) return 'SCVT Pending';
+  return 'Review';
+}
+
+function getResponsibleTeam_(r) {
+  if (String(r.Admission_Form_Status || '').trim() !== 'Completed') return 'Admission Staff';
+  if (String(r.Documents_Verified_Status || '').trim() !== 'Verified') return 'Admission Desk';
+  if (String(r.Undertaking_Signed_Status || '').trim() === 'Pending' || String(r.Undertaking_Signed_Status || '').trim() === '') return 'Admission Staff';
+  if (!String(r.PRN_Number || '').trim() || !String(r.SCVTUP_Registration_No || '').trim()) return 'Scholarship/PRN Desk';
+  return 'Admin';
+}
+
+function getAdmissionFormMasters() {
+  try {
+    const institutes = getRowsAsObjects_(SHEETS.institutes)
+      .filter(r => String(r.Institute_ID || '').trim() !== '')
+      .map(r => ({
+        id: r.Institute_ID,
+        name: r.Institute_Name,
+        code: r.Code,
+        address: r.Institute_Address || ''
+      }));
+
+    const trades = getRowsAsObjects_(SHEETS.trades)
+      .filter(r => String(r.Trade || '').trim() !== '')
+      .map(r => ({
+        trade: r.Trade,
+        tradeCode: r.Trade_Code,
+        duration: r.Duration,
+        instituteId: r.Institute_ID,
+        ncvtScvt: r.NCVT_SCVT,
+        standardFees: r.Standard_Fees,
+        status: r.Status
+      }));
+
+    const agents = getRowsAsObjects_(SHEETS.agents)
+      .filter(r => String(r.Agent_ID || '').trim() !== '')
+      .map(r => ({
+        id: r.Agent_ID,
+        name: r.Agent_Name,
+        mobile: r.Mobile
+      }));
+
+    return {
+      institutes,
+      trades,
+      agents,
+      staticOptions: {
+        year: ['1st', '2nd'],
+        gender: ['Male', 'Female', 'Other'],
+        category: ['General', 'OBC', 'SC', 'ST', 'Other'],
+        paymentMode: ['Direct', 'Agent'],
+        scholarshipStatus: ['Not Applied', 'Applied', 'Under Process', 'Query by Deptt.', 'Approved', 'Rejected'],
+        photoAvailable: ['Yes', 'No'],
+        casteCertificate: ['Yes', 'No', 'Not Required'],
+        incomeCertificate: ['Yes', 'No'],
+        admissionFormStatus: ['Not Started', 'In Progress', 'Completed'],
+        documentStatus: ['Pending', 'Verified', 'Incomplete'],
+        undertakingStatus: ['Pending', 'Signed', 'Uploaded']
+      }
+    };
+  } catch (err) {
+    throw new Error('getAdmissionFormMasters failed: ' + err.message);
+  }
+}
+
+function getStudents(filters) {
+  try {
+    let students = getValidStudents_();
+    filters = filters || {};
+
+    if (filters.instituteId) students = students.filter(r => String(r.Institute_ID || '') === String(filters.instituteId || ''));
+    if (filters.trade) students = students.filter(r => String(r.Trade || '') === String(filters.trade || ''));
+    if (filters.session) students = students.filter(r => String(r.Session || '') === String(filters.session || ''));
+    if (filters.year) students = students.filter(r => String(r.Year || '') === String(filters.year || ''));
+    if (filters.admissionStatus) {
+      students = students.filter(r =>
+        String(r.Admission_Completion_Status || r.Admission_Status || '').trim() === String(filters.admissionStatus || '').trim()
+      );
+    }
+
+    if (filters.search) {
+      const q = String(filters.search).toLowerCase().trim();
+      students = students.filter(r =>
+        String(r.Student_Name || '').toLowerCase().includes(q) ||
+        String(r.Student_ID || '').toLowerCase().includes(q) ||
+        String(r.Mobile || '').toLowerCase().includes(q)
+      );
+    }
+
+    return students.map(r => ({
+      Student_ID: r.Student_ID || '',
+      Student_Name: r.Student_Name || '',
+      Institute_ID: r.Institute_ID || '',
+      Trade: r.Trade || '',
+      Session: r.Session || '',
+      Year: r.Year || '',
+      Mobile: r.Mobile || '',
+      Admission_Status: r.Admission_Completion_Status || r.Admission_Status || '',
+      Document_Status: r.Documents_Verified_Status || '',
+      Undertaking_Status: r.Undertaking_Signed_Status || '',
+      Final_Fees: r.Final_Fees || '',
+      Due_Amount: r.Due_Amount || '',
+      Undertaking_Link: r.Undertaking_Generated_URL || ''
+    }));
+  } catch (err) {
+    throw new Error('getStudents failed: ' + err.message);
+  }
+}
+
+function saveStudent(formData) {
+  const missing = STUDENT_REQUIRED_FIELDS.filter(f => !String(formData[f] || '').trim());
+  if (missing.length > 0) {
+    throw new Error('Missing required fields: ' + missing.join(', '));
+  }
+
+  validateStudentMasterData_(formData);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const sheet = getSheet_(SHEETS.students);
+    const headers = getHeaders_(SHEETS.students);
+    const headerMap = getHeaderMapFromHeaders_(headers);
+
+    if (!headerMap['Institute_ID']) {
+      throw new Error('Institute_ID header not found in STUDENTS_MASTER.');
+    }
+
+    const targetRow = getNextWritableRowByHeader_(sheet, headerMap, 'Institute_ID', 2);
+    writeManualFieldsFast_(sheet, targetRow, headerMap, formData, STUDENT_MANUAL_FIELDS);
+
+    SpreadsheetApp.flush();
+    clearStudentCache_();
+
+    const studentId = headerMap['Student_ID']
+      ? sheet.getRange(targetRow, headerMap['Student_ID']).getDisplayValue()
+      : '';
+
+    return {
+      success: true,
+      row: targetRow,
+      studentId: studentId
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getNextWritableRowByHeader_(sheet, headerMap, headerName, startRow) {
+  const colIndex = headerMap[headerName];
+  if (!colIndex) throw new Error('Header not found: ' + headerName);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < startRow) return startRow;
+
+  const values = sheet.getRange(startRow, colIndex, lastRow - startRow + 1, 1).getDisplayValues().flat();
+
+  for (let i = 0; i < values.length; i++) {
+    if (!String(values[i] || '').trim()) {
+      return startRow + i;
+    }
+  }
+
+  return lastRow + 1;
+}
+
+function writeManualFieldsFast_(sheet, rowNumber, headerMap, formData, fields) {
+  const updates = [];
+
+  fields.forEach(field => {
+    const colIndex = headerMap[field];
+    if (!colIndex) return;
+    updates.push({
+      colIndex,
+      value: normalizeStudentFieldValue_(field, formData[field])
+    });
+  });
+
+  updates.sort((a, b) => a.colIndex - b.colIndex);
+
+  let group = [];
+  for (let i = 0; i < updates.length; i++) {
+    const curr = updates[i];
+    const prev = group[group.length - 1];
+
+    if (!prev || curr.colIndex === prev.colIndex + 1) {
+      group.push(curr);
+    } else {
+      flushWriteGroup_(sheet, rowNumber, group);
+      group = [curr];
+    }
+  }
+
+  if (group.length) flushWriteGroup_(sheet, rowNumber, group);
+}
+
+function flushWriteGroup_(sheet, rowNumber, group) {
+  const startCol = group[0].colIndex;
+  const values = [group.map(item => item.value)];
+  sheet.getRange(rowNumber, startCol, 1, group.length).setValues(values);
+}
+
+function normalizeStudentFieldValue_(field, value) {
+  if (value === null || value === undefined) return '';
+
+  const dateFields = [
+    'Agreement_Effective_Date',
+    'Query_Submission_Date',
+    'Scholarship_Approved_Date',
+    'Scholarship_Credit_Date',
+    'Undertaking_Generated_On',
+    'Completion_Date'
+  ];
+
+  const numberFields = [
+    'Scholarship_Credited_Amount',
+    'Fees_If_Scholarship',
+    'Fees_If_No_Scholarship',
+    'Undertaking_Print_Count'
+  ];
+
+  if (typeof value === 'string') value = value.trim();
+
+  if (dateFields.includes(field)) {
+    if (!value) return '';
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? value : d;
+  }
+
+  if (numberFields.includes(field)) {
+    if (value === '') return '';
+    return isNaN(Number(value)) ? value : Number(value);
+  }
+
+  return value;
+}
+
+function validateStudentMasterData_(formData) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'iti_master_validation_v1';
+  let masterData = cache.get(cacheKey);
+
+  if (masterData) {
+    masterData = JSON.parse(masterData);
+  } else {
+    masterData = {
+      institutes: getRowsAsObjects_(SHEETS.institutes)
+        .map(r => String(r.Institute_ID || '').trim())
+        .filter(Boolean),
+      trades: getRowsAsObjects_(SHEETS.trades)
+        .map(r => String(r.Trade || '').trim().toLowerCase())
+        .filter(Boolean),
+      agents: getRowsAsObjects_(SHEETS.agents)
+        .map(r => String(r.Agent_ID || '').trim())
+        .filter(Boolean)
+    };
+    cache.put(cacheKey, JSON.stringify(masterData), 300);
+  }
+
+  const instituteId = String(formData.Institute_ID || '').trim();
+  const trade = String(formData.Trade || '').trim().toLowerCase();
+  const agentId = String(formData.Agent_ID || '').trim();
+
+  if (instituteId && masterData.institutes.indexOf(instituteId) === -1) {
+    throw new Error('Invalid Institute_ID: ' + instituteId);
+  }
+  if (trade && masterData.trades.indexOf(trade) === -1) {
+    throw new Error('Invalid Trade: ' + formData.Trade);
+  }
+  if (agentId && masterData.agents.indexOf(agentId) === -1) {
+    throw new Error('Invalid Agent_ID: ' + agentId);
+  }
+}
+
+function saveStudentDocuments(studentId, studentName, files) {
+  try {
+    const rootFolder = DriveApp.getFolderById(CONFIG_DOCS.rootFolderId);
+    const folderName = `${studentName} - ${studentId}`;
+    const studentFolder = getOrCreateSubfolder_(rootFolder, folderName);
+
+    const uploaded = [];
+
+    files.forEach(file => {
+      if (!file || !file.fileName || !file.base64Data) return;
+
+      const contentType = file.mimeType || 'application/octet-stream';
+      const bytes = Utilities.base64Decode(file.base64Data);
+      const blob = Utilities.newBlob(bytes, contentType, file.fileName);
+      const createdFile = studentFolder.createFile(blob);
+
+      uploaded.push({
+        documentType: file.documentType,
+        fileName: createdFile.getName(),
+        url: createdFile.getUrl(),
+        fileId: createdFile.getId()
+      });
+    });
+
+    return {
+      success: true,
+      folderName,
+      uploaded
+    };
+  } catch (err) {
+    throw new Error('saveStudentDocuments failed: ' + err.message);
+  }
+}
+
+function getOrCreateSubfolder_(parentFolder, folderName) {
+  const folders = parentFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) return folders.next();
+  return parentFolder.createFolder(folderName);
+}
+
+function debugStudentRead() {
+  const rows = getValidStudents_();
+  return {
+    count: rows.length,
+    sample: rows.slice(0, 5).map(r => ({
+      row: r.__rowNumber,
+      studentId: r.Student_ID,
+      instituteId: r.Institute_ID,
+      studentName: r.Student_Name,
+      trade: r.Trade,
+      mobile: r.Mobile
+    }))
+  };
+}
+
+function debugDashboardCounts() {
+  const students = getValidStudents_();
+  return {
+    total: students.length,
+    sample: students.slice(0, 5).map(r => ({
+      studentId: r.Student_ID,
+      studentName: r.Student_Name,
+      admission: r.Admission_Completion_Status || r.Admission_Status || '',
+      doc: r.Documents_Verified_Status || '',
+      undertaking: r.Undertaking_Signed_Status || '',
+      due: r.Due_Amount || ''
+    }))
+  };
+}
+5. Final Scripts.html
+<script>
+  let masterData = null;
+  let isSavingAdmission = false;
+
+  function showPage(pageId, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+
+    const target = document.getElementById(pageId);
+    if (target) target.classList.add('active');
+
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    const title = document.getElementById('pageTitle');
+    if (title && btn) title.textContent = btn.textContent;
+  }
+
+  function initApp() {
+    loadDashboard();
+    loadMasters();
+    loadStudents();
+    bindStudentFilterEnterKey();
+  }
+
+  function loadDashboard() {
+    google.script.run
+      .withSuccessHandler(renderDashboard)
+      .withFailureHandler(err => {
+        const cardBox = document.getElementById('dashboardCards');
+        if (cardBox) {
+          cardBox.innerHTML = `<div class="card">Dashboard load failed: ${escapeHtml(err.message || String(err))}</div>`;
+        }
+
+        const recent = document.getElementById('recentAdmissions');
+        const pending = document.getElementById('pendingWork');
+        const due = document.getElementById('dueList');
+
+        if (recent) recent.innerHTML = '';
+        if (pending) pending.innerHTML = '';
+        if (due) due.innerHTML = '';
+      })
+      .getDashboardData();
+  }
+
+  function loadMasters() {
+    google.script.run
+      .withSuccessHandler(setupMasters)
+      .withFailureHandler(err => {
+        console.error('Master load failed:', err);
+      })
+      .getAdmissionFormMasters();
+  }
+
+  function renderDashboard(data) {
+    console.log('dashboard data', data);
+
+    const cards = (data && data.cards) ? data.cards : {};
+    const cardContainer = document.getElementById('dashboardCards');
+    if (!cardContainer) return;
+
+    const safeCards = {
+      totalStudents: Number(cards.totalStudents || 0),
+      pendingAdmissions: Number(cards.pendingAdmissions || 0),
+      documentsPending: Number(cards.documentsPending || 0),
+      undertakingsPending: Number(cards.undertakingsPending || 0),
+      prnPending: Number(cards.prnPending || 0),
+      scvtPending: Number(cards.scvtPending || 0),
+      scholarshipQueries: Number(cards.scholarshipQueries || 0),
+      dueStudents: Number(cards.dueStudents || 0)
+    };
+
+    cardContainer.innerHTML = Object.entries(safeCards).map(([k, v]) => `
+      <div class="card">
+        <h4>${formatLabel(k)}</h4>
+        <div class="value">${v}</div>
+      </div>
+    `).join('');
+
+    renderTable(
+      'recentAdmissions',
+      ['Date', 'Student Name', 'Trade', 'Institute', 'Admission Status'],
+      (data.recentAdmissions || []).map(r => [
+        r.date || '',
+        r.studentName || '',
+        r.trade || '',
+        r.institute || '',
+        r.admissionStatus || ''
+      ])
+    );
+
+    renderTable(
+      'pendingWork',
+      ['Student Name', 'Missing Step', 'Responsible Team'],
+      (data.pendingWork || []).map(r => [
+        r.studentName || '',
+        r.missingStep || '',
+        r.responsibleTeam || ''
+      ])
+    );
+
+    renderTable(
+      'dueList',
+      ['Student Name', 'Final Fees', 'Paid', 'Due'],
+      (data.dueList || []).map(r => [
+        r.studentName || '',
+        r.finalFees || '',
+        r.paid || '',
+        r.due || ''
+      ])
+    );
+  }
+
+  function renderTable(containerId, headers, rows) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const html = `
+      <table>
+        <thead>
+          <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${
+            rows && rows.length
+              ? rows.map(r => `<tr>${r.map(c => `<td>${escapeHtml(c ?? '')}</td>`).join('')}</tr>`).join('')
+              : `<tr><td colspan="${headers.length}">No data</td></tr>`
+          }
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  function fillSelect(id, items, includeBlank, blankLabel) {
+    const select = document.getElementById(id);
+    if (!select) return;
+
+    const firstOption = includeBlank
+      ? '<option value="">Select</option>'
+      : `<option value="">${escapeHtml(blankLabel || 'All')}</option>`;
+
+    select.innerHTML =
+      firstOption +
+      (items || []).map(v => `<option value="${escapeHtml(String(v))}">${escapeHtml(String(v))}</option>`).join('');
+  }
+
+  function fillSelectFromObjects(id, items, valueKey, labelKey, includeBlank, blankLabel) {
+    const select = document.getElementById(id);
+    if (!select) return;
+
+    const firstOption = includeBlank
+      ? '<option value="">Select</option>'
+      : `<option value="">${escapeHtml(blankLabel || 'All')}</option>`;
+
+    select.innerHTML =
+      firstOption +
+      (items || []).map(item => `
+        <option value="${escapeHtml(String(item[valueKey] || ''))}">
+          ${escapeHtml(String(item[labelKey] || ''))}
+        </option>
+      `).join('');
+  }
+
+  function setupMasters(data) {
+    masterData = data || {};
+
+    fillSelectFromObjects('Institute_ID', masterData.institutes || [], 'id', 'name', true);
+    fillSelect('Trade', uniqueValues((masterData.trades || []).map(t => t.trade)), true);
+    fillSelect('Year', (masterData.staticOptions || {}).year || [], true);
+    fillSelect('Gender', (masterData.staticOptions || {}).gender || [], true);
+    fillSelect('Category', (masterData.staticOptions || {}).category || [], true);
+    fillSelect('Payment_Mode', (masterData.staticOptions || {}).paymentMode || [], true);
+    fillSelect('Photo_Available', (masterData.staticOptions || {}).photoAvailable || [], true);
+    fillSelect('Caste_Certificate_Available', (masterData.staticOptions || {}).casteCertificate || [], true);
+    fillSelect('Income_Certificate_Available', (masterData.staticOptions || {}).incomeCertificate || [], true);
+    fillSelect('Scholarship_Application_Status', (masterData.staticOptions || {}).scholarshipStatus || [], true);
+    fillSelect('Admission_Form_Status', (masterData.staticOptions || {}).admissionFormStatus || [], true);
+    fillSelect('Documents_Verified_Status', (masterData.staticOptions || {}).documentStatus || [], true);
+    fillSelect('Undertaking_Signed_Status', (masterData.staticOptions || {}).undertakingStatus || [], true);
+
+    fillSelectFromObjects('Agent_ID', masterData.agents || [], 'id', 'id', true);
+
+    fillSelectFromObjects('filterInstitute', masterData.institutes || [], 'id', 'name', false, 'All Institutes');
+    fillSelect('filterTrade', uniqueValues((masterData.trades || []).map(t => t.trade)), false, 'All Trades');
+    fillSelect('filterYear', (masterData.staticOptions || {}).year || [], false, 'All Years');
+    fillSelect('filterAdmissionStatus', ['Pending', 'Completed'], false, 'All Admission Status');
+  }
+
+  function uniqueValues(arr) {
+    return [...new Set((arr || []).filter(Boolean))];
+  }
+
+  function bindStudentFilterEnterKey() {
+    const ids = ['studentSearch', 'filterSession'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          loadStudents();
+        }
+      });
+    });
+  }
+
+  function getStudentFilters() {
+    return {
+      search: document.getElementById('studentSearch')?.value || '',
+      instituteId: document.getElementById('filterInstitute')?.value || '',
+      trade: document.getElementById('filterTrade')?.value || '',
+      session: document.getElementById('filterSession')?.value || '',
+      year: document.getElementById('filterYear')?.value || '',
+      admissionStatus: document.getElementById('filterAdmissionStatus')?.value || ''
+    };
+  }
+
+  function loadStudents() {
+    const filters = getStudentFilters();
+    console.log('Applying filters:', filters);
+
+    const container = document.getElementById('studentsTable');
+    if (container) {
+      container.innerHTML = 'Loading students...';
+    }
+
+    google.script.run
+      .withSuccessHandler(renderStudents)
+      .withFailureHandler(err => {
+        const box = document.getElementById('studentsTable');
+        if (box) {
+          box.innerHTML = `Students load failed: ${escapeHtml(err.message || String(err))}`;
+        }
+      })
+      .getStudents(filters);
+  }
+
+  function applyStudentFilters() {
+    loadStudents();
+  }
+
+  function resetStudentFilters() {
+    const ids = [
+      'studentSearch',
+      'filterInstitute',
+      'filterTrade',
+      'filterSession',
+      'filterYear',
+      'filterAdmissionStatus'
+    ];
+
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = '';
+    });
+
+    loadStudents();
+  }
+
+  function renderStudents(rows) {
+    console.log('students rows', rows);
+
+    const container = document.getElementById('studentsTable');
+    if (!container) return;
+
+    const safeRows = Array.isArray(rows) ? rows : [];
+
+    const headers = [
+      'Student_ID',
+      'Student_Name',
+      'Institute_ID',
+      'Trade',
+      'Session',
+      'Year',
+      'Mobile',
+      'Admission_Status',
+      'Document_Status',
+      'Undertaking_Status',
+      'Final_Fees',
+      'Due_Amount',
+      'Actions'
+    ];
+
+    const html = `
+      <table>
+        <thead>
+          <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${
+            safeRows.length
+              ? safeRows.map(r => `
+                <tr>
+                  <td>${escapeHtml(r.Student_ID || '')}</td>
+                  <td>${escapeHtml(r.Student_Name || '')}</td>
+                  <td>${escapeHtml(r.Institute_ID || '')}</td>
+                  <td>${escapeHtml(r.Trade || '')}</td>
+                  <td>${escapeHtml(r.Session || '')}</td>
+                  <td>${escapeHtml(r.Year || '')}</td>
+                  <td>${escapeHtml(r.Mobile || '')}</td>
+                  <td>${escapeHtml(r.Admission_Status || '')}</td>
+                  <td>${escapeHtml(r.Document_Status || '')}</td>
+                  <td>${escapeHtml(r.Undertaking_Status || '')}</td>
+                  <td>${escapeHtml(r.Final_Fees || '')}</td>
+                  <td>${escapeHtml(r.Due_Amount || '')}</td>
+                  <td>
+                    ${r.Undertaking_Link
+                      ? `<a class="link-btn" href="${escapeHtml(r.Undertaking_Link)}" target="_blank">Open Undertaking</a>`
+                      : ''}
+                  </td>
+                </tr>
+              `).join('')
+              : `<tr><td colspan="13">No students found</td></tr>`
+          }
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+  }
+
+  async function saveAdmission() {
+    if (isSavingAdmission) return;
+
+    const resultBox = document.getElementById('admissionResult');
+    const saveBtn = document.querySelector('.button-row button');
+
+    try {
+      isSavingAdmission = true;
+      if (saveBtn) saveBtn.disabled = true;
+      if (resultBox) resultBox.innerHTML = 'Saving...';
+
+      const form = document.getElementById('admissionForm');
+      const formData = Object.fromEntries(new FormData(form).entries());
+
+      const requiredFields = ['Institute_ID', 'Student_Name', 'Trade', 'Session', 'Year', 'Mobile'];
+      const missing = requiredFields.filter(f => !String(formData[f] || '').trim());
+
+      if (missing.length > 0) {
+        if (resultBox) resultBox.innerHTML = `Please fill required fields: ${missing.join(', ')}`;
+        isSavingAdmission = false;
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(async (res) => {
+          try {
+            const studentId = res.studentId;
+            const studentName = formData.Student_Name || '';
+            const files = await collectDocumentFiles();
+
+            if (files.length > 0 && studentId && studentName) {
+              google.script.run
+                .withSuccessHandler((uploadRes) => {
+                  if (resultBox) {
+                    resultBox.innerHTML =
+                      `Saved successfully. Student ID: ${escapeHtml(studentId)}<br>Documents uploaded: ${(uploadRes.uploaded || []).length}`;
+                  }
+                  form.reset();
+                  loadStudents();
+                  loadDashboard();
+                })
+                .withFailureHandler((err) => {
+                  if (resultBox) {
+                    resultBox.innerHTML = `Student saved, but document upload failed: ${escapeHtml(err.message || String(err))}`;
+                  }
+                  loadStudents();
+                  loadDashboard();
+                })
+                .saveStudentDocuments(studentId, studentName, files);
+            } else {
+              if (resultBox) resultBox.innerHTML = `Saved successfully. Student ID: ${escapeHtml(studentId)}`;
+              form.reset();
+              loadStudents();
+              loadDashboard();
+            }
+          } catch (e) {
+            if (resultBox) resultBox.innerHTML = `Saved, but post-save step failed: ${escapeHtml(e.message || String(e))}`;
+          } finally {
+            isSavingAdmission = false;
+            if (saveBtn) saveBtn.disabled = false;
+          }
+        })
+        .withFailureHandler((err) => {
+          if (resultBox) resultBox.innerHTML = `Save failed: ${escapeHtml(err.message || String(err))}`;
+          isSavingAdmission = false;
+          if (saveBtn) saveBtn.disabled = false;
+        })
+        .saveStudent(formData);
+
+    } catch (e) {
+      if (resultBox) resultBox.innerHTML = `Form error: ${escapeHtml(e.message || String(e))}`;
+      isSavingAdmission = false;
+      if (saveBtn) saveBtn.disabled = false;
+    }
+  }
+
+  async function collectDocumentFiles() {
+    const fileConfigs = [
+      { inputId: 'Photo_File', documentType: 'Photo' },
+      { inputId: 'Aadhaar_File', documentType: 'Aadhaar' },
+      { inputId: 'Caste_File', documentType: 'Caste Certificate' },
+      { inputId: 'Income_File', documentType: 'Income Certificate' }
+    ];
+
+    const results = [];
+
+    for (const cfg of fileConfigs) {
+      const input = document.getElementById(cfg.inputId);
+      if (input && input.files && input.files[0]) {
+        const fileObj = await fileToBase64Object(input.files[0], cfg.documentType);
+        results.push(fileObj);
+      }
+    }
+
+    return results;
+  }
+
+  function fileToBase64Object(file, documentType) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        const base64Data = dataUrl.split(',')[1];
+
+        resolve({
+          documentType,
+          fileName: file.name,
+          mimeType: file.type,
+          base64Data
+        });
+      };
+
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function resetAdmissionForm() {
+    const form = document.getElementById('admissionForm');
+    if (form) form.reset();
+
+    const resultBox = document.getElementById('admissionResult');
+    if (resultBox) resultBox.innerHTML = '';
+  }
+
+  function formatLabel(key) {
+    return String(key)
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, s => s.toUpperCase());
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  window.onload = initApp;
+</script>
+6. Students.html filter section
+<div class="panel">
+  <h3>Student List</h3>
+
+  <div class="filters-grid">
+    <input type="text" id="studentSearch" placeholder="Search by name, ID, mobile">
+    <select id="filterInstitute"></select>
+    <select id="filterTrade"></select>
+    <input type="text" id="filterSession" placeholder="Session">
+    <select id="filterYear"></select>
+    <select id="filterAdmissionStatus"></select>
+
+    <div class="button-row">
+      <button type="button" onclick="applyStudentFilters()">Apply Filters</button>
+      <button type="button" onclick="resetStudentFilters()">Clear Filters</button>
+    </div>
+  </div>
+
+  <div id="studentsTable" style="margin-top:16px;"></div>
+</div>
+7. Deployment checklist
+Paste Code.gs and save.
+Paste Scripts.html and save.
+Update Students.html filter block.
+Fix ADMISSION_DESK formulas.
+Deploy a new web app version.
+Hard refresh browser or open in incognito.
+Retest save, refresh, filtering, upload, and dashboard.
+8. Honest current note
+At the time of this handoff, the app flow is working for admission save and student filtering. If dashboard counts still show 0, the next thing to verify is whether ADMISSION_DESK/status columns are filling correctly from STUDENTS_MASTER after the formulas above are applied.

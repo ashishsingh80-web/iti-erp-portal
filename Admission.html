@@ -1,0 +1,149 @@
+<div class="panel">
+  <div class="panel-head">
+    <div>
+      <p class="eyebrow">Fast Entry</p>
+      <h3>Admission Form</h3>
+      <p class="panel-copy">Designed for quick submissions while preserving formula-driven columns in `STUDENTS_MASTER`.</p>
+    </div>
+    <div class="pill">Required fields marked with *</div>
+  </div>
+
+  <form id="admissionForm" novalidate>
+    <div class="form-grid">
+      <div class="field col-4">
+        <label for="Institute_ID">Institute *</label>
+        <select id="Institute_ID" name="Institute_ID"></select>
+      </div>
+      <div class="field col-4">
+        <label for="Trade">Trade *</label>
+        <select id="Trade" name="Trade"></select>
+      </div>
+      <div class="field col-2">
+        <label for="Session">Session *</label>
+        <input id="Session" name="Session" placeholder="2026-27">
+      </div>
+      <div class="field col-2">
+        <label for="Year">Year *</label>
+        <select id="Year" name="Year"></select>
+      </div>
+
+      <div class="field col-4">
+        <label for="Student_Name">Student Name *</label>
+        <input id="Student_Name" name="Student_Name" placeholder="Enter full name">
+      </div>
+      <div class="field col-4">
+        <label for="Mobile">Mobile *</label>
+        <input id="Mobile" name="Mobile" placeholder="10-digit mobile">
+      </div>
+      <div class="field col-4">
+        <label for="Email_ID">Email</label>
+        <input id="Email_ID" name="Email_ID" placeholder="student@email.com">
+      </div>
+
+      <div class="field col-4">
+        <label for="Father_Name">Father Name</label>
+        <input id="Father_Name" name="Father_Name">
+      </div>
+      <div class="field col-4">
+        <label for="Mother_Name">Mother Name</label>
+        <input id="Mother_Name" name="Mother_Name">
+      </div>
+      <div class="field col-2">
+        <label for="Gender">Gender</label>
+        <select id="Gender" name="Gender"></select>
+      </div>
+      <div class="field col-2">
+        <label for="Category">Category</label>
+        <select id="Category" name="Category"></select>
+      </div>
+
+      <div class="field col-4">
+        <label for="Agent_ID">Agent ID</label>
+        <select id="Agent_ID" name="Agent_ID"></select>
+      </div>
+      <div class="field col-4">
+        <label for="Payment_Mode">Payment Mode</label>
+        <select id="Payment_Mode" name="Payment_Mode"></select>
+      </div>
+      <div class="field col-4">
+        <label for="Scholarship_Application_Status">Scholarship Status</label>
+        <select id="Scholarship_Application_Status" name="Scholarship_Application_Status"></select>
+      </div>
+
+      <div class="field col-6">
+        <label for="Address">Address</label>
+        <textarea id="Address" name="Address" placeholder="Enter full address"></textarea>
+      </div>
+      <div class="field col-3">
+        <label for="Aadhaar_No">Aadhaar No</label>
+        <input id="Aadhaar_No" name="Aadhaar_No">
+      </div>
+      <div class="field col-3">
+        <label for="Bank_Account_No">Bank Account No</label>
+        <input id="Bank_Account_No" name="Bank_Account_No">
+      </div>
+      <div class="field col-3">
+        <label for="IFSC_Code">IFSC Code</label>
+        <input id="IFSC_Code" name="IFSC_Code">
+      </div>
+      <div class="field col-3">
+        <label for="Bank_Name">Bank Name</label>
+        <input id="Bank_Name" name="Bank_Name">
+      </div>
+
+      <div class="field col-3">
+        <label for="Photo_Available">Photo Available</label>
+        <select id="Photo_Available" name="Photo_Available"></select>
+      </div>
+      <div class="field col-3">
+        <label for="Caste_Certificate_Available">Caste Certificate</label>
+        <select id="Caste_Certificate_Available" name="Caste_Certificate_Available"></select>
+      </div>
+      <div class="field col-3">
+        <label for="Income_Certificate_Available">Income Certificate</label>
+        <select id="Income_Certificate_Available" name="Income_Certificate_Available"></select>
+      </div>
+      <div class="field col-3">
+        <label for="Documents_Verified_Status">Document Status</label>
+        <select id="Documents_Verified_Status" name="Documents_Verified_Status"></select>
+      </div>
+
+      <div class="field col-4">
+        <label for="Admission_Form_Status">Admission Form Status</label>
+        <select id="Admission_Form_Status" name="Admission_Form_Status"></select>
+      </div>
+      <div class="field col-4">
+        <label for="Undertaking_Signed_Status">Undertaking Status</label>
+        <select id="Undertaking_Signed_Status" name="Undertaking_Signed_Status"></select>
+      </div>
+      <div class="field col-4">
+        <label for="Completed_By">Completed By</label>
+        <input id="Completed_By" name="Completed_By" placeholder="Staff member name">
+      </div>
+
+      <div class="field col-3">
+        <label for="Photo_File">Photo</label>
+        <input id="Photo_File" type="file" accept="image/*">
+      </div>
+      <div class="field col-3">
+        <label for="Aadhaar_File">Aadhaar</label>
+        <input id="Aadhaar_File" type="file">
+      </div>
+      <div class="field col-3">
+        <label for="Caste_File">Caste Certificate</label>
+        <input id="Caste_File" type="file">
+      </div>
+      <div class="field col-3">
+        <label for="Income_File">Income Certificate</label>
+        <input id="Income_File" type="file">
+      </div>
+    </div>
+
+    <div class="button-row" style="margin-top:20px;">
+      <button id="saveAdmissionBtn" class="btn" type="button" onclick="saveAdmission()">Save Admission</button>
+      <button class="btn secondary" type="button" onclick="resetAdmissionForm()">Reset Form</button>
+    </div>
+  </form>
+
+  <div id="admissionResult" class="status-banner hidden" style="margin-top:18px;"></div>
+</div>

@@ -1,0 +1,25 @@
+{
+  "entries": [
+    {
+      "id": "1774927318487-mnv9mz1d",
+      "eventType": "LOGIN_SUCCESS",
+      "userId": "cmnaw8at7000g9xmr1j7xxtdn",
+      "userName": "Portal Admin",
+      "userEmail": "admin@itierp.local",
+      "userRole": "ADMIN",
+      "ipAddress": "::1",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+      "deviceLabel": "Mac",
+      "createdAt": "2026-03-31T03:21:58.487Z"
+    }
+  ],
+  "lockouts": {
+    "admin@itierp.local": {
+      "failedAttempts": 0,
+      "lockedUntil": null,
+      "reason": null,
+      "updatedAt": "2026-03-31T03:21:58.487Z"
+    }
+  },
+  "updatedAt": "2026-03-31T03:21:58.487Z"
+}
