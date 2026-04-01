@@ -8,6 +8,7 @@ import { BackupDesk } from "@/components/backup/backup-desk";
 import { AuditLogPanel } from "@/components/audit/audit-log-panel";
 import { CertificatesDesk } from "@/components/certificates/certificates-desk";
 import { CommunicationDesk } from "@/components/communication/communication-desk";
+import { DocumentsDesk } from "@/components/documents/documents-desk";
 import { EnquiryDesk } from "@/components/enquiry/enquiry-desk";
 import { ExamStatusDesk } from "@/components/exams/exam-status-desk";
 import { AgentLedgerPanel } from "@/components/fees/agent-ledger-panel";
@@ -23,7 +24,10 @@ import { OcrImportDesk } from "@/components/modules/ocr-import-desk";
 import { DashboardOperations } from "@/components/modules/dashboard-operations";
 import { StageBoard } from "@/components/modules/stage-board";
 import { PlacementDesk } from "@/components/placement/placement-desk";
+import { PrnDesk } from "@/components/prn/prn-desk";
 import { ReportsDashboard } from "@/components/reports/reports-dashboard";
+import { ScvtDesk } from "@/components/scvt/scvt-desk";
+import { ScholarshipDesk } from "@/components/scholarship/scholarship-desk";
 import { AddressMasterPanel } from "@/components/settings/address-master-panel";
 import { ClassificationMastersPanel } from "@/components/settings/classification-masters-panel";
 import { ExpandableSettingsSection } from "@/components/settings/expandable-settings-section";
@@ -128,6 +132,7 @@ export default async function ModulePage({
         />
       ) : null}
       {slug === "enquiry" ? <EnquiryDesk /> : null}
+      {slug === "documents" ? <DocumentsDesk /> : null}
       {slug === "exam-status" ? <ExamStatusDesk search={typeof query.search === "string" ? query.search : ""} /> : null}
       {slug === "attendance" ? <AttendanceDesk /> : null}
       {slug === "undertaking" ? <UndertakingDesk /> : null}
@@ -187,9 +192,9 @@ export default async function ModulePage({
         />
       ) : null}
       {slug === "hr" ? <HrDesk /> : null}
-      {slug === "scholarship" ? <OcrImportDesk moduleSlug="scholarship" /> : null}
-      {slug === "scvt" ? <OcrImportDesk moduleSlug="scvt" /> : null}
-      {slug === "prn" ? <OcrImportDesk moduleSlug="prn" /> : null}
+      {slug === "scholarship" ? <ScholarshipDesk /> : null}
+      {slug === "scvt" ? <ScvtDesk /> : null}
+      {slug === "prn" ? <PrnDesk /> : null}
       {slug === "reports" ? (
         <ReportsDashboard
           filters={{

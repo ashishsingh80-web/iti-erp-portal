@@ -243,7 +243,15 @@ export async function getAgentOutstandingLedger() {
           }
         },
         include: {
-          feeProfile: true
+          feeProfile: true,
+          feeTransactions: {
+            where: {
+              payerType: "STUDENT"
+            },
+            select: {
+              amountPaid: true
+            }
+          }
         }
       },
       collections: {
@@ -277,6 +285,13 @@ export async function getAgentOutstandingLedger() {
       totalStudents,
       committedAmount: committedAmount.toFixed(2),
       paidAgainstStudents: paidAgainstStudents.toFixed(2),
+      directPaidByStudents: agent.students
+        .reduce(
+          (sum, student) =>
+            sum + student.feeTransactions.reduce((studentSum, tx) => studentSum + Number(tx.amountPaid || 0), 0),
+          0
+        )
+        .toFixed(2),
       outstandingAmount: outstandingAmount.toFixed(2),
       totalCollections: totalCollections.toFixed(2),
       unallocatedBalance: unallocatedBalance.toFixed(2),

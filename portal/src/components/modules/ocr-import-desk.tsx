@@ -121,6 +121,10 @@ export function OcrImportDesk({ moduleSlug }: OcrImportDeskProps) {
       setMessage("Analyze the PDF first.");
       return;
     }
+    if (!file) {
+      setMessage("Choose the same PDF file again before apply.");
+      return;
+    }
 
     try {
       setApplying(true);
@@ -128,7 +132,9 @@ export function OcrImportDesk({ moduleSlug }: OcrImportDeskProps) {
       const formData = new FormData();
       formData.append("mode", "apply");
       formData.append("kind", preview.kind);
-      formData.append("preview", JSON.stringify(preview));
+      formData.append("file", file);
+      if (session) formData.append("session", session);
+      if (yearLabel) formData.append("yearLabel", yearLabel);
 
       const response = await fetch("/api/ocr-imports", {
         method: "POST",

@@ -7,6 +7,33 @@ import { reserveGeneratedCode } from "@/lib/numbering-config";
 import { normalizeSessionLabel } from "@/lib/session-config";
 
 type CsvRow = Record<string, string>;
+type InstituteTrade = {
+  id: string;
+  tradeCode: string;
+  name: string;
+};
+type InstituteWithTrades = {
+  id: string;
+  instituteCode: string;
+  trades: InstituteTrade[];
+};
+type ParsedImportRow = {
+  sourceRow: CsvRow;
+  rowNumber: number;
+  fullName: string;
+  fatherName: string;
+  mobile: string;
+  dob: Date | null;
+  session: string;
+  yearLabel: string;
+  unitNumber: number;
+  instituteCode: string;
+  tradeName: string;
+  institute: InstituteWithTrades | undefined;
+  trade: InstituteTrade | undefined;
+  canImport: boolean;
+  problems: string[];
+};
 
 function parseCsv(text: string) {
   const rows: string[][] = [];
@@ -84,6 +111,88 @@ function normalizeText(value: string) {
   return value.trim().toUpperCase();
 }
 
+async function parseImportRows(
+  rows: CsvRow[],
+  institutes: InstituteWithTrades[]
+): Promise<ParsedImportRow[]> {
+  return Promise.all(
+    rows.map(async (row, index) => {
+      const instituteCode = pickValue(row, ["instituteCode", "institute"]);
+      const tradeCodeOrName = pickValue(row, ["tradeCode", "tradeName", "trade"]);
+      const fullName = pickValue(row, ["fullName", "studentName", "name"]);
+      const fatherName = pickValue(row, ["fatherName", "parentName", "guardianName"]);
+      const mobile = pickValue(row, ["mobile"]);
+      const dateOfBirthRaw = pickValue(row, ["dateOfBirth", "dob"]);
+      const session = normalizeSessionLabel(pickValue(row, ["session"]) || "");
+      const yearLabel = pickValue(row, ["yearLabel", "year"]) || "1st";
+      const unitNumber = Number(pickValue(row, ["unitNumber", "unit"]) || 0);
+
+      const institute = institutes.find((item) => item.instituteCode.toUpperCase() === instituteCode.toUpperCase());
+      const trade = institute?.trades.find(
+        (item) =>
+          item.tradeCode.toUpperCase() === tradeCodeOrName.toUpperCase() ||
+          item.name.toUpperCase() === tradeCodeOrName.toUpperCase()
+      );
+      const dob = parseDate(dateOfBirthRaw);
+
+      const problems: string[] = [];
+      if (!fullName) problems.push("Student name missing");
+      if (!institute) problems.push("Institute not found");
+      if (!trade) problems.push("Trade not found");
+      if (!session) problems.push("Session missing");
+      if (!dob) problems.push("DOB invalid");
+      if (!unitNumber) problems.push("Unit missing");
+      if (!mobile) problems.push("Mobile missing");
+
+      const duplicate =
+        dob && fullName
+          ? await prisma.student.findFirst({
+              where: {
+                deletedAt: null,
+                OR: [
+                  mobile
+                    ? {
+                        mobile,
+                        dateOfBirth: dob
+                      }
+                    : undefined,
+                  {
+                    fullName: normalizeText(fullName),
+                    fatherName: fatherName ? normalizeText(fatherName) : undefined,
+                    dateOfBirth: dob
+                  }
+                ].filter(Boolean) as any
+              },
+              select: {
+                studentCode: true,
+                fullName: true
+              }
+            })
+          : null;
+
+      if (duplicate) problems.push(`Duplicate: ${duplicate.fullName} (${duplicate.studentCode})`);
+
+      return {
+        sourceRow: row,
+        rowNumber: index + 2,
+        fullName,
+        fatherName,
+        mobile,
+        dob,
+        session,
+        yearLabel,
+        unitNumber,
+        instituteCode,
+        tradeName: trade?.name || tradeCodeOrName || "-",
+        institute,
+        trade,
+        canImport: problems.length === 0,
+        problems
+      };
+    })
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const user = await requireUser();
@@ -109,77 +218,19 @@ export async function POST(request: Request) {
       }
     });
 
-    const previewRows = await Promise.all(
-      rows.map(async (row, index) => {
-        const instituteCode = pickValue(row, ["instituteCode", "institute"]);
-        const tradeCodeOrName = pickValue(row, ["tradeCode", "tradeName", "trade"]);
-        const fullName = pickValue(row, ["fullName", "studentName", "name"]);
-        const fatherName = pickValue(row, ["fatherName"]);
-        const mobile = pickValue(row, ["mobile"]);
-        const dateOfBirthRaw = pickValue(row, ["dateOfBirth", "dob"]);
-        const session = normalizeSessionLabel(pickValue(row, ["session"]) || "");
-        const yearLabel = pickValue(row, ["yearLabel", "year"]) || "1st";
-        const unitNumber = Number(pickValue(row, ["unitNumber", "unit"]) || 0);
-
-        const institute = institutes.find((item) => item.instituteCode.toUpperCase() === instituteCode.toUpperCase());
-        const trade = institute?.trades.find(
-          (item) =>
-            item.tradeCode.toUpperCase() === tradeCodeOrName.toUpperCase() ||
-            item.name.toUpperCase() === tradeCodeOrName.toUpperCase()
-        );
-        const dob = parseDate(dateOfBirthRaw);
-
-        const problems: string[] = [];
-        if (!fullName) problems.push("Student name missing");
-        if (!institute) problems.push("Institute not found");
-        if (!trade) problems.push("Trade not found");
-        if (!session) problems.push("Session missing");
-        if (!dob) problems.push("DOB invalid");
-        if (!unitNumber) problems.push("Unit missing");
-        if (!mobile) problems.push("Mobile missing");
-
-        const duplicate =
-          dob && fullName
-            ? await prisma.student.findFirst({
-                where: {
-                  deletedAt: null,
-                  OR: [
-                    mobile
-                      ? {
-                          mobile,
-                          dateOfBirth: dob
-                        }
-                      : undefined,
-                    {
-                      fullName: normalizeText(fullName),
-                      fatherName: fatherName ? normalizeText(fatherName) : undefined,
-                      dateOfBirth: dob
-                    }
-                  ].filter(Boolean) as any
-                },
-                select: {
-                  studentCode: true,
-                  fullName: true
-                }
-              })
-            : null;
-
-        if (duplicate) problems.push(`Duplicate: ${duplicate.fullName} (${duplicate.studentCode})`);
-
-        return {
-          rowNumber: index + 2,
-          fullName: fullName || "-",
-          instituteCode,
-          tradeName: trade?.name || tradeCodeOrName || "-",
-          session: session || "-",
-          yearLabel,
-          unitNumber: unitNumber || 0,
-          mobile: mobile || "-",
-          canImport: problems.length === 0,
-          problems
-        };
-      })
-    );
+    const parsedRows = await parseImportRows(rows, institutes);
+    const previewRows = parsedRows.map((item) => ({
+      rowNumber: item.rowNumber,
+      fullName: item.fullName || "-",
+      instituteCode: item.instituteCode,
+      tradeName: item.tradeName,
+      session: item.session || "-",
+      yearLabel: item.yearLabel,
+      unitNumber: item.unitNumber || 0,
+      mobile: item.mobile || "-",
+      canImport: item.canImport,
+      problems: item.problems
+    }));
 
     if (mode !== "import") {
       return NextResponse.json({
@@ -196,84 +247,51 @@ export async function POST(request: Request) {
     const imported: string[] = [];
     const skipped: string[] = previewRows.filter((item) => !item.canImport).map((item) => `${item.fullName} (Row ${item.rowNumber})`);
 
-    for (const row of rows) {
-      const fullName = pickValue(row, ["fullName", "studentName", "name"]);
-      const fatherName = pickValue(row, ["fatherName"]);
-      const mobile = pickValue(row, ["mobile"]);
-      const dob = parseDate(pickValue(row, ["dateOfBirth", "dob"]));
-      const session = pickValue(row, ["session"]);
-      const unitNumber = Number(pickValue(row, ["unitNumber", "unit"]) || 0);
-      const instituteCode = pickValue(row, ["instituteCode", "institute"]);
-      const tradeCodeOrName = pickValue(row, ["tradeCode", "tradeName", "trade"]);
-      const institute = institutes.find((item) => item.instituteCode.toUpperCase() === instituteCode.toUpperCase());
-      const trade = institute?.trades.find(
-        (item) =>
-          item.tradeCode.toUpperCase() === tradeCodeOrName.toUpperCase() ||
-          item.name.toUpperCase() === tradeCodeOrName.toUpperCase()
-      );
-
-      if (!fullName || !fatherName || !mobile || !dob || !session || !unitNumber || !institute || !trade) {
+    for (const item of parsedRows.filter((row) => row.canImport)) {
+      if (!item.fullName || !item.mobile || !item.dob || !item.session || !item.unitNumber || !item.institute || !item.trade) {
         continue;
       }
-
-      const exists = await prisma.student.findFirst({
-        where: {
-          deletedAt: null,
-          OR: [
-            {
-              mobile,
-              dateOfBirth: dob
-            },
-            {
-              fullName: normalizeText(fullName),
-              fatherName: normalizeText(fatherName),
-              dateOfBirth: dob
-            }
-          ]
-        }
-      });
-
-      if (exists) continue;
+      const guardianName = item.fatherName || "NOT PROVIDED";
 
       const studentCode = await reserveGeneratedCode("student", {
-        institute: institute.instituteCode,
-        trade: trade.tradeCode,
-        session
+        institute: item.institute.instituteCode,
+        trade: item.trade.tradeCode,
+        session: item.session
       });
 
       const created = await prisma.student.create({
         data: {
           studentCode,
           admissionNumber: studentCode,
-          enrollmentNumber: pickValue(row, ["enrollmentNumber", "registrationNumber"]) || null,
-          instituteId: institute.id,
-          tradeId: trade.id,
-          unitNumber,
+          enrollmentNumber: pickValue(item.sourceRow, ["enrollmentNumber", "registrationNumber"]) || null,
+          instituteId: item.institute.id,
+          tradeId: item.trade.id,
+          unitNumber: item.unitNumber,
           createdById: user.id,
           admissionMode: AdmissionMode.DIRECT,
-          session,
-          yearLabel: pickValue(row, ["yearLabel", "year"]) || "1st",
-          admissionDate: parseDate(pickValue(row, ["admissionDate"])) || new Date(),
-          admissionType: pickValue(row, ["admissionType"]) || "DIRECT",
-          admissionStatusLabel: pickValue(row, ["admissionStatus", "admissionStatusLabel"]) || "REGISTERED",
-          seatType: pickValue(row, ["seatType"]) || "REGULAR",
-          rollNumber: pickValue(row, ["rollNumber"]) || null,
-          batchLabel: pickValue(row, ["batch", "batchLabel"]) || null,
-          shiftLabel: pickValue(row, ["shift", "shiftLabel"]) || null,
+          session: item.session,
+          yearLabel: item.yearLabel || "1st",
+          admissionDate: parseDate(pickValue(item.sourceRow, ["admissionDate"])) || new Date(),
+          admissionType: pickValue(item.sourceRow, ["admissionType"]) || "DIRECT",
+          admissionStatusLabel: pickValue(item.sourceRow, ["admissionStatus", "admissionStatusLabel"]) || "REGISTERED",
+          seatType: pickValue(item.sourceRow, ["seatType"]) || "REGULAR",
+          rollNumber: pickValue(item.sourceRow, ["rollNumber"]) || null,
+          batchLabel: pickValue(item.sourceRow, ["batch", "batchLabel"]) || null,
+          shiftLabel: pickValue(item.sourceRow, ["shift", "shiftLabel"]) || null,
           status: StudentStatus.UNDER_REVIEW,
-          fullName: normalizeText(fullName),
-          fatherName: normalizeText(fatherName),
-          motherName: pickValue(row, ["motherName"]) ? normalizeText(pickValue(row, ["motherName"])) : null,
-          mobile,
-          alternateMobile: pickValue(row, ["alternateMobile"]) || null,
-          email: pickValue(row, ["email"]) || null,
-          category: pickValue(row, ["category"]) || null,
-          caste: pickValue(row, ["caste"]) || null,
-          religion: pickValue(row, ["religion"]) || null,
-          incomeDetails: pickValue(row, ["incomeDetails"]) || null,
-          domicileDetails: pickValue(row, ["domicileDetails"]) || null,
-          dateOfBirth: dob,
-          address: pickValue(row, ["address"]) || null,
+          fullName: normalizeText(item.fullName),
+          fatherName: normalizeText(guardianName),
+          motherName: pickValue(item.sourceRow, ["motherName"]) ? normalizeText(pickValue(item.sourceRow, ["motherName"])) : null,
+          mobile: item.mobile,
+          alternateMobile: pickValue(item.sourceRow, ["alternateMobile"]) || null,
+          email: pickValue(item.sourceRow, ["email"]) || null,
+          category: pickValue(item.sourceRow, ["category"]) || null,
+          caste: pickValue(item.sourceRow, ["caste"]) || null,
+          religion: pickValue(item.sourceRow, ["religion"]) || null,
+          incomeDetails: pickValue(item.sourceRow, ["incomeDetails"]) || null,
+          domicileDetails: pickValue(item.sourceRow, ["domicileDetails"]) || null,
+          dateOfBirth: item.dob,
+          address: pickValue(item.sourceRow, ["address"]) || null,
           documentsStatus: VerificationStatus.PENDING,
           admissionFormStatus: VerificationStatus.PENDING,
           eligibilityStatus: VerificationStatus.PENDING,
@@ -286,8 +304,8 @@ export async function POST(request: Request) {
         data: {
           studentId: created.id,
           relation: "FATHER",
-          name: normalizeText(fatherName),
-          mobile: pickValue(row, ["parentMobile"]) || null
+          name: normalizeText(guardianName),
+          mobile: pickValue(item.sourceRow, ["parentMobile"]) || null
         }
       });
 
@@ -295,12 +313,12 @@ export async function POST(request: Request) {
         data: {
           studentId: created.id,
           level: "TENTH",
-          schoolName: pickValue(row, ["schoolName"]) || null,
-          boardUniversity: pickValue(row, ["board", "boardUniversity"]) || null,
-          certificateNumber: pickValue(row, ["certificateNumber", "tenthCertificateDetails"]) || null,
-          rollNumber: pickValue(row, ["qualificationRollNumber", "rollNumber"]) || null,
-          passingYear: Number(pickValue(row, ["passingYear"]) || 0) || null,
-          percentage: Number(pickValue(row, ["percentage", "marks"]) || 0) || null,
+          schoolName: pickValue(item.sourceRow, ["schoolName"]) || null,
+          boardUniversity: pickValue(item.sourceRow, ["board", "boardUniversity"]) || null,
+          certificateNumber: pickValue(item.sourceRow, ["certificateNumber", "tenthCertificateDetails"]) || null,
+          rollNumber: pickValue(item.sourceRow, ["qualificationRollNumber", "rollNumber"]) || null,
+          passingYear: Number(pickValue(item.sourceRow, ["passingYear"]) || 0) || null,
+          percentage: Number(pickValue(item.sourceRow, ["percentage", "marks"]) || 0) || null,
           isPassed: true,
           minimumEligibility: true,
           verificationStatus: VerificationStatus.PENDING

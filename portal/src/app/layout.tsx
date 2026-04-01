@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
 import { AppHeader } from "@/components/header/app-header";
@@ -11,6 +11,7 @@ import { getDashboardMetrics } from "@/lib/services/dashboard-service";
 import { readSessionConfig } from "@/lib/session-config";
 import "./globals.css";
 import { CsrfFetchWrapper } from "@/components/security/csrf-fetch-wrapper";
+import { AppSerwistProvider } from "@/components/serwist-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const space = Space_Grotesk({ subsets: ["latin"], variable: "--font-space" });
@@ -18,17 +19,39 @@ const space = Space_Grotesk({ subsets: ["latin"], variable: "--font-space" });
 export const metadata: Metadata = {
   title: "ITI ERP Portal",
   description: "Custom admissions portal for ITI ERP",
+  applicationName: "ITI ERP Portal",
   icons: {
-    icon: "/portal-logo.png",
-    apple: "/portal-logo.png"
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: "/icons/icon-192.png"
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ITI ERP"
+  },
+  formatDetection: {
+    telephone: false
   }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f1f4ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#06281f" }
+  ]
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   const user = await getCurrentUser();
-  const sessionConfig = user ? await readSessionConfig() : null;
-  const lang = await readAppLanguage();
-  const sidebarBadgeMetrics = user ? await getDashboardMetrics() : [];
+  const [sessionConfig, lang, sidebarBadgeMetrics] = await Promise.all([
+    user ? readSessionConfig() : Promise.resolve(null),
+    readAppLanguage(),
+    user ? getDashboardMetrics() : Promise.resolve([])
+  ]);
   const sidebarBadges = Object.fromEntries(
     sidebarBadgeMetrics.map((item) => [item.label, item.value])
   ) as Record<string, string>;
@@ -36,7 +59,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang={lang === "hi" ? "hi" : "en"}>
       <body suppressHydrationWarning className={`${inter.variable} ${space.variable} font-sans`}>
-                <CsrfFetchWrapper />
+        <AppSerwistProvider>
+          <CsrfFetchWrapper />
         {user ? (
           <>
             <div className="mx-auto grid min-h-screen max-w-[1700px] items-start gap-6 px-4 py-6 print:block print:max-w-none print:px-0 print:py-0 md:grid-cols-[320px_minmax(0,1fr)] md:px-6">
@@ -59,6 +83,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <ToastHost />
           </>
         )}
+        </AppSerwistProvider>
       </body>
     </html>
   );

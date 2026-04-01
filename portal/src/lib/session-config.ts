@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { cache } from "react";
 
 export type SessionConfig = {
   activeOneYearSession: string;
@@ -64,7 +65,7 @@ export function buildDefaultSessionConfig(date = new Date()): SessionConfig {
   };
 }
 
-export async function readSessionConfig(): Promise<SessionConfig> {
+async function loadSessionConfig(): Promise<SessionConfig> {
   try {
     const raw = await readFile(sessionConfigPath, "utf8");
     const parsed = JSON.parse(raw) as Partial<SessionConfig>;
@@ -85,6 +86,8 @@ export async function readSessionConfig(): Promise<SessionConfig> {
     return buildDefaultSessionConfig();
   }
 }
+
+export const readSessionConfig = cache(loadSessionConfig);
 
 export async function saveSessionConfig(input: Omit<SessionConfig, "updatedAt">) {
   const payload: SessionConfig = {

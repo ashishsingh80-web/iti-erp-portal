@@ -1,11 +1,14 @@
 import { EnquiryStatus, ScholarshipStatus, VerificationStatus } from "@prisma/client";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { formatInr } from "@/lib/currency";
 import { prisma } from "@/lib/prisma";
 import { buildSessionVariants, readSessionConfig } from "@/lib/session-config";
 import type { DashboardMetric } from "@/lib/types";
 
 const prismaAny = prisma as any;
-const DASHBOARD_CACHE_TTL_MS = 20_000;
+/** Longer TTL helps layout + home page share work within one navigation (same request + warm cache). */
+const DASHBOARD_CACHE_TTL_MS = 60_000;
 
 type CacheEntry<T> = {
   data: T;
@@ -65,7 +68,7 @@ function setCache<T>(store: Map<string, CacheEntry<T>>, key: string, data: T) {
   });
 }
 
-export async function getDashboardMetrics(selectedSession?: string | null): Promise<DashboardMetric[]> {
+async function fetchDashboardMetrics(selectedSession?: string | null): Promise<DashboardMetric[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const sessionKey = selectedSession && selectedSession !== "ALL_ACTIVE" ? selectedSession : "ALL_ACTIVE";
@@ -247,13 +250,15 @@ export async function getDashboardMetrics(selectedSession?: string | null): Prom
           in: dashboardSessions
         }
       },
+      distinct: ["instituteId", "tradeId"],
       select: {
+        instituteId: true,
+        tradeId: true,
         institute: {
           select: {
             instituteCode: true
           }
-        },
-        tradeId: true
+        }
       }
     })
   ]);
@@ -340,7 +345,23 @@ export async function getDashboardMetrics(selectedSession?: string | null): Prom
   return metrics;
 }
 
-export async function getDashboardInsights(selectedSession?: string | null): Promise<DashboardInsights> {
+function requestSessionKey(selectedSession?: string | null): string {
+  if (!selectedSession || selectedSession === "ALL_ACTIVE") return "ALL_ACTIVE";
+  return selectedSession;
+}
+
+/** Same-request dedupe (React cache) + cross-request cache on Vercel (`unstable_cache`). */
+export const getDashboardMetrics = cache(async (selectedSession?: string | null) => {
+  const rk = requestSessionKey(selectedSession);
+  const dayKey = toLocalDayKey(new Date());
+  return unstable_cache(
+    async () => fetchDashboardMetrics(selectedSession),
+    ["portal-dash-metrics", rk, dayKey],
+    { revalidate: 60, tags: ["dashboard-metrics"] }
+  )();
+});
+
+async function fetchDashboardInsights(selectedSession?: string | null): Promise<DashboardInsights> {
   const sessionKey = selectedSession && selectedSession !== "ALL_ACTIVE" ? selectedSession : "ALL_ACTIVE";
   const monthKey = toLocalMonthKey(new Date());
   const cacheKey = `${sessionKey}:${monthKey}`;
@@ -369,7 +390,7 @@ export async function getDashboardInsights(selectedSession?: string | null): Pro
     monthlyAdmissionsTrend,
     monthlyEnquiryTrend,
     insightStudents,
-    insightFeeTransactions,
+    feeCollectionsBySession,
     insightEnquiries,
     tradeRows
   ] = await Promise.all([
@@ -510,23 +531,15 @@ export async function getDashboardInsights(selectedSession?: string | null): Pro
         }
       }
     }),
-    prisma.feeTransaction.findMany({
-      where: {
-        student: {
-          session: {
-            in: dashboardSessions
-          }
-        }
-      },
-      select: {
-        amountPaid: true,
-        student: {
-          select: {
-            session: true
-          }
-        }
-      }
-    }),
+    Promise.all(
+      dashboardSessions.map(async (session) => {
+        const agg = await prisma.feeTransaction.aggregate({
+          where: { student: { session } },
+          _sum: { amountPaid: true }
+        });
+        return { session, total: toSafeNumber(agg._sum.amountPaid) };
+      })
+    ),
     prisma.enquiry.findMany({
       where: {
         OR: [
@@ -705,16 +718,14 @@ export async function getDashboardInsights(selectedSession?: string | null): Pro
     sessionMap.set(student.session, currentSession);
   }
 
-  for (const payment of insightFeeTransactions) {
-    const session = payment.student?.session;
-    if (!session) continue;
+  for (const { session, total } of feeCollectionsBySession) {
     const currentSession = sessionMap.get(session) || {
       session,
       totalStudents: 0,
       collections: 0,
       dueAmount: 0
     };
-    currentSession.collections += toSafeNumber(payment.amountPaid);
+    currentSession.collections += total;
     sessionMap.set(session, currentSession);
   }
 
@@ -796,16 +807,30 @@ export async function getDashboardInsights(selectedSession?: string | null): Pro
       ...item,
       conversionRate: item.enquiries ? Math.round((item.conversions / item.enquiries) * 100) : 0
     })),
-    instituteComparison: Array.from(instituteMap.values()).sort((a, b) => b.totalStudents - a.totalStudents),
+    instituteComparison: Array.from(instituteMap.values())
+      .sort((a, b) => b.totalStudents - a.totalStudents)
+      .slice(0, 12),
     tradeDemand: Array.from(tradeMap.values())
       .sort((a, b) => b.admissions + b.enquiries - (a.admissions + a.enquiries))
       .slice(0, 8),
-    sessionFinancials: Array.from(sessionMap.values()).sort((a, b) => a.session.localeCompare(b.session))
+    sessionFinancials: Array.from(sessionMap.values())
+      .sort((a, b) => a.session.localeCompare(b.session))
+      .slice(0, 12)
   };
 
   setCache(dashboardInsightsCache, cacheKey, insights);
   return insights;
 }
+
+export const getDashboardInsights = cache(async (selectedSession?: string | null) => {
+  const rk = requestSessionKey(selectedSession);
+  const monthKey = toLocalMonthKey(new Date());
+  return unstable_cache(
+    async () => fetchDashboardInsights(selectedSession),
+    ["portal-dash-insights", rk, monthKey],
+    { revalidate: 90, tags: ["dashboard-insights"] }
+  )();
+});
 
 export async function getDashboardDiagnostics(selectedSession?: string | null) {
   const sessionConfig = await readSessionConfig();

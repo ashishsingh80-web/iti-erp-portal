@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertUserActionAccess } from "@/lib/access";
+import { assertUserActionAccess, canUserPerformAction } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import {
   buildCsvReport,
@@ -38,6 +38,17 @@ export async function GET(request: Request) {
       page: searchParams.get("page") || "1",
       pageSize: searchParams.get("pageSize") || "10"
     };
+
+    if (format === "csv") {
+      const canDownload = canUserPerformAction(user, "reports", "download");
+      const canExport = canUserPerformAction(user, "reports", "export");
+      if (!canDownload && !canExport) {
+        return NextResponse.json(
+          { ok: false, message: "Access denied for report export. Download or export permission is required." },
+          { status: 403 }
+        );
+      }
+    }
 
     if (!report) {
       const summaries = await getReportSummaries(filters);

@@ -60,3 +60,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ag
     );
   }
 }
+
+export async function DELETE(_: Request, { params }: { params: Promise<{ agentId: string }> }) {
+  try {
+    const user = await requireUser();
+    assertUserActionAccess(user, "agents", "delete");
+    const { agentId } = await params;
+
+    await prisma.agent.delete({
+      where: { id: agentId }
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: error instanceof Error ? error.message : "Unable to delete agent"
+      },
+      { status: 400 }
+    );
+  }
+}

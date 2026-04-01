@@ -248,10 +248,10 @@ export const portalModules: PortalModule[] = [
   },
   {
     slug: "agents",
-    title: "Agents",
+    title: "Agent Management",
     shortTitle: "Agents",
-    description: "Register agents, keep contact details, and control active status.",
-    highlights: ["Register", "Edit", "Active status"],
+    description: "Admission agent and counselor master with student mapping, collections, dues, and performance tracking.",
+    highlights: ["Agent master", "Admissions", "Ledger tracking"],
     group: "administration"
   },
   {
@@ -265,24 +265,37 @@ export const portalModules: PortalModule[] = [
 ];
 
 export const portalNavigationGroups: PortalNavigationGroup[] = [
-  { key: "dashboard", title: "Control Room", slugs: ["dashboard"] },
-  { key: "operations", title: "Admissions & Counselling", slugs: ["admissions", "enquiry"] },
+  { key: "dashboard", title: "Dashboard", slugs: ["dashboard", "management"] },
   {
     key: "operations",
-    title: "Students & Lifecycle",
-    slugs: ["students", "promote", "alumni", "student-archive", "attendance"]
+    title: "Admission Management",
+    slugs: ["admissions", "enquiry", "documents", "undertaking", "id-cards"]
+  },
+  {
+    key: "operations",
+    title: "Student Management",
+    slugs: ["students", "promote", "alumni", "student-archive", "no-dues"]
+  },
+  { key: "administration", title: "Agent Management", slugs: ["agents"] },
+  { key: "compliance", title: "Scholarship Management", slugs: ["scholarship"] },
+  { key: "finance", title: "Fees Management", slugs: ["fees"] },
+  { key: "operations", title: "Attendance Management", slugs: ["attendance"] },
+  {
+    key: "operations",
+    title: "Academic Management",
+    slugs: ["timetable", "placement"]
   },
   {
     key: "compliance",
-    title: "Compliance & Certification",
-    slugs: ["documents", "scholarship", "scvt", "prn", "undertaking", "exam-status", "no-dues", "certificates", "id-cards"]
+    title: "Examination Management",
+    slugs: ["exam-status", "scvt", "prn"]
   },
-  {
-    key: "operations",
-    title: "Academic & Campus",
-    slugs: ["timetable", "inventory", "library", "placement"]
-  },
-  { key: "finance", title: "Finance & HR", slugs: ["fees", "accounts", "agents", "hr"] },
-  { key: "reports", title: "Reports & Management", slugs: ["reports", "management"] },
-  { key: "administration", title: "Administration", slugs: ["communication", "grievance", "backup", "settings"] }
+  { key: "compliance", title: "Certificate & Document Management", slugs: ["certificates"] },
+  { key: "administration", title: "Employee / HR Management", slugs: ["hr"] },
+  { key: "operations", title: "Inventory / Store Management", slugs: ["inventory", "library"] },
+  { key: "finance", title: "Accounting", slugs: ["accounts"] },
+  { key: "administration", title: "Communication Module", slugs: ["communication", "grievance"] },
+  { key: "reports", title: "Reports & Analytics", slugs: ["reports"] },
+  { key: "administration", title: "Master Setup", slugs: ["settings"] },
+  { key: "administration", title: "Legal & Compliance", slugs: ["backup"] }
 ];

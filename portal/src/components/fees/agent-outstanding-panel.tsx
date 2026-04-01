@@ -11,6 +11,7 @@ type AgentOutstandingRow = {
   totalStudents: number;
   committedAmount: string;
   paidAgainstStudents: string;
+  directPaidByStudents: string;
   outstandingAmount: string;
   totalCollections: string;
   unallocatedBalance: string;
@@ -86,7 +87,7 @@ export function AgentOutstandingPanel() {
                 </div>
                 <SkeletonBlock className="h-8 w-32" />
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
                 {[1, 2, 3, 4, 5].map((card) => (
                   <div key={card} className="rounded-2xl bg-white px-4 py-3">
                     <SkeletonBlock className="h-4 w-24" />
@@ -99,6 +100,17 @@ export function AgentOutstandingPanel() {
         ) : rows.length ? (
           rows.map((row) => (
             <article key={row.agentCode} className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
+              {(() => {
+                const committed = Number(row.committedAmount || 0);
+                const paid = Number(row.paidAgainstStudents || 0);
+                const outstanding = Number(row.outstandingAmount || 0);
+                const collections = Number(row.totalCollections || 0);
+                const unallocated = Number(row.unallocatedBalance || 0);
+                const formulaDue = Math.max(committed - paid, 0);
+                const allocatedFromCollections = Math.max(collections - unallocated, 0);
+                const dueDiff = Math.abs(formulaDue - outstanding);
+                return (
+                  <>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h4 className="font-semibold text-slate-900">{row.agentName}</h4>
@@ -107,6 +119,21 @@ export function AgentOutstandingPanel() {
                 <span className="rounded-full bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700">
                   Outstanding {formatInr(row.outstandingAmount)}
                 </span>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-xs text-emerald-900">
+                <p className="font-semibold uppercase tracking-[0.16em]">Formula Preview</p>
+                <p className="mt-1">
+                  Due = Committed ({formatInr(committed)}) - Paid ({formatInr(paid)}) = {formatInr(formulaDue)}
+                </p>
+                <p className="mt-1">
+                  Allocated From Collections = Collections ({formatInr(collections)}) - Unallocated ({formatInr(unallocated)}) = {formatInr(allocatedFromCollections)}
+                </p>
+                {dueDiff > 0.01 ? (
+                  <p className="mt-1 font-semibold text-rose-700">
+                    Check needed: calculated due and stored due differ by {formatInr(dueDiff)}
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -121,6 +148,10 @@ export function AgentOutstandingPanel() {
                 <div className="rounded-2xl bg-white px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Paid Against Students</p>
                   <p className="mt-1 font-semibold text-emerald-700">{formatInr(row.paidAgainstStudents)}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Direct Paid By Students</p>
+                  <p className="mt-1 font-semibold text-sky-700">{formatInr(row.directPaidByStudents)}</p>
                 </div>
                 <div className="rounded-2xl bg-white px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Collections Taken</p>
@@ -167,6 +198,9 @@ export function AgentOutstandingPanel() {
                   </tbody>
                 </table>
               </div>
+                  </>
+                );
+              })()}
             </article>
           ))
         ) : (

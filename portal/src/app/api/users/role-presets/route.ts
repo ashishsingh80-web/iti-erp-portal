@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
+import { findInvalidActionKeysForModules } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { createAuditLog } from "@/lib/services/audit-service";
 import { createStoredRolePreset, deleteStoredRolePreset, listStoredRolePresets, updateStoredRolePreset } from "@/lib/user-role-presets";
@@ -52,13 +53,25 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const moduleSlugs = Array.isArray(payload.moduleSlugs) ? payload.moduleSlugs : [];
+    const actionKeys = Array.isArray(payload.actionKeys) ? payload.actionKeys : [];
+    const invalidActionKeys = findInvalidActionKeysForModules(actionKeys, moduleSlugs);
+    if (invalidActionKeys.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `Action keys must match allowed modules. Invalid keys: ${invalidActionKeys.join(", ")}`
+        },
+        { status: 400 }
+      );
+    }
 
     const preset = await createStoredRolePreset({
       label: payload.label,
       description: payload.description,
       baseRole: payload.baseRole as UserRole,
-      moduleSlugs: Array.isArray(payload.moduleSlugs) ? payload.moduleSlugs : [],
-      actionKeys: Array.isArray(payload.actionKeys) ? payload.actionKeys : []
+      moduleSlugs,
+      actionKeys
     });
 
     await createAuditLog({
@@ -178,13 +191,25 @@ export async function PATCH(request: Request) {
         { status: 400 }
       );
     }
+    const moduleSlugs = Array.isArray(payload.moduleSlugs) ? payload.moduleSlugs : [];
+    const actionKeys = Array.isArray(payload.actionKeys) ? payload.actionKeys : [];
+    const invalidActionKeys = findInvalidActionKeysForModules(actionKeys, moduleSlugs);
+    if (invalidActionKeys.length) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: `Action keys must match allowed modules. Invalid keys: ${invalidActionKeys.join(", ")}`
+        },
+        { status: 400 }
+      );
+    }
 
     const preset = await updateStoredRolePreset(payload.key, {
       label: payload.label,
       description: payload.description,
       baseRole: payload.baseRole as UserRole,
-      moduleSlugs: Array.isArray(payload.moduleSlugs) ? payload.moduleSlugs : [],
-      actionKeys: Array.isArray(payload.actionKeys) ? payload.actionKeys : []
+      moduleSlugs,
+      actionKeys
     });
 
     await createAuditLog({

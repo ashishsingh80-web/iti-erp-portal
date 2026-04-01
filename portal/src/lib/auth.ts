@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { Gender, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getUserInvalidBefore } from "@/lib/session-control";
@@ -164,7 +165,7 @@ export async function authenticateUser(email: string, password: string) {
   };
 }
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
+async function loadCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -210,6 +211,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     allowedActionKeys: user.allowedActionKeys
   };
 }
+
+/** One DB read per request when layout + pages both need the user. */
+export const getCurrentUser = cache(loadCurrentUser);
 
 export async function requireUser() {
   const user = await getCurrentUser();

@@ -1,4 +1,5 @@
 import { PaymentStatus, ScholarshipStatus, VerificationStatus } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { formatInr } from "@/lib/currency";
 
@@ -51,7 +52,7 @@ function toStatusCountMap<T extends string>(
   return map;
 }
 
-export async function getDashboardStageBoards() {
+async function loadDashboardStageBoards(): Promise<StageBoardData[]> {
   const cacheKey = "dashboard-stage-boards";
   const cached = stageBoardsCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -74,6 +75,15 @@ export async function getDashboardStageBoards() {
     expiresAt: Date.now() + STAGE_BOARD_CACHE_TTL_MS
   });
   return boards;
+}
+
+export async function getDashboardStageBoards() {
+  const dayKey = new Date().toISOString().slice(0, 10);
+  return unstable_cache(
+    async () => loadDashboardStageBoards(),
+    ["portal-stage-boards", dayKey],
+    { revalidate: 45, tags: ["stage-boards"] }
+  )();
 }
 
 export async function getDocumentsStageBoard(): Promise<StageBoardData> {

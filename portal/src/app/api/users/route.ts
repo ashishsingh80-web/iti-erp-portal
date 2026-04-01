@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
+import { findInvalidActionKeysForModules } from "@/lib/access";
 import { hashPassword, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/services/audit-service";
@@ -73,6 +74,22 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const hasCustomModuleAccess = Boolean(payload.hasCustomModuleAccess);
+    const hasCustomActionAccess = Boolean(payload.hasCustomActionAccess);
+    const allowedModuleSlugs = payload.allowedModuleSlugs || [];
+    const allowedActionKeys = payload.allowedActionKeys || [];
+    if (hasCustomModuleAccess && hasCustomActionAccess) {
+      const invalidActionKeys = findInvalidActionKeysForModules(allowedActionKeys, allowedModuleSlugs);
+      if (invalidActionKeys.length) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: `Action keys must match allowed modules. Invalid keys: ${invalidActionKeys.join(", ")}`
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const created = await prisma.user.create({
       data: {
@@ -81,10 +98,10 @@ export async function POST(request: Request) {
         passwordHash: hashPassword(payload.password.trim()),
         role: payload.role,
         isActive: true,
-        hasCustomModuleAccess: Boolean(payload.hasCustomModuleAccess),
-        allowedModuleSlugs: payload.allowedModuleSlugs || [],
-        hasCustomActionAccess: Boolean(payload.hasCustomActionAccess),
-        allowedActionKeys: payload.allowedActionKeys || []
+        hasCustomModuleAccess,
+        allowedModuleSlugs,
+        hasCustomActionAccess,
+        allowedActionKeys
       }
     });
 

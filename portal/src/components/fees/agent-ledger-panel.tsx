@@ -195,6 +195,11 @@ export function AgentLedgerPanel({
   const allocatedTotal = Object.values(selected).reduce((sum, amount) => sum + Number(amount || 0), 0);
   const enteredTotal = Number(totalAmount || 0);
   const remainingAmount = enteredTotal - allocatedTotal;
+  const selectedReuseCollection = collections.find((item) => item.id === reuseCollectionId) || null;
+  const selectedReuseUnallocated = Number(selectedReuseCollection?.unallocatedAmount || 0);
+  const reuseRemainingAmount = selectedReuseUnallocated - allocatedTotal;
+  const isNewCollectionMathInvalid = !Number.isFinite(enteredTotal) || enteredTotal <= 0 || allocatedTotal > enteredTotal;
+  const isReuseMathInvalid = Boolean(selectedReuseCollection) && allocatedTotal > selectedReuseUnallocated;
 
   async function createCollection() {
     setError("");
@@ -397,6 +402,34 @@ export function AgentLedgerPanel({
         </span>
       </div>
 
+      <div
+        className={`mt-3 rounded-2xl border px-4 py-3 text-xs ${
+          isNewCollectionMathInvalid || isReuseMathInvalid
+            ? "border-rose-200 bg-rose-50 text-rose-900"
+            : "border-emerald-100 bg-emerald-50/60 text-emerald-900"
+        }`}
+      >
+        <p className="font-semibold uppercase tracking-[0.16em]">Formula Preview</p>
+        <p className="mt-1">
+          New Collection Remaining = Total Entered ({formatInr(enteredTotal)}) - Allocated ({formatInr(allocatedTotal)}) ={" "}
+          {formatInr(Number.isFinite(remainingAmount) ? remainingAmount : 0)}
+        </p>
+        {selectedReuseCollection ? (
+          <p className="mt-1">
+            Reuse Remaining = Selected Unallocated ({formatInr(selectedReuseUnallocated)}) - New Allocation ({formatInr(allocatedTotal)}) ={" "}
+            {formatInr(Number.isFinite(reuseRemainingAmount) ? reuseRemainingAmount : 0)}
+          </p>
+        ) : (
+          <p className="mt-1 text-emerald-800">Select a reuse voucher to preview unallocated-balance math before allocation.</p>
+        )}
+        {isNewCollectionMathInvalid ? (
+          <p className="mt-1 font-semibold">Invalid new collection math: allocated amount cannot exceed entered total.</p>
+        ) : null}
+        {isReuseMathInvalid ? (
+          <p className="mt-1 font-semibold">Invalid reuse math: allocated amount cannot exceed selected unallocated balance.</p>
+        ) : null}
+      </div>
+
       {(message || error) ? (
         <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${error ? "border-rose-200 bg-rose-50 text-rose-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
           {error || message}
@@ -455,10 +488,20 @@ export function AgentLedgerPanel({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
-        <button className="rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70" disabled={loading || bootstrapping} onClick={() => void createCollection()} type="button">
+        <button
+          className="rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
+          disabled={loading || bootstrapping || isNewCollectionMathInvalid}
+          onClick={() => void createCollection()}
+          type="button"
+        >
           {loading ? "Saving Agent Collection..." : "Save Agent Collection"}
         </button>
-        <button className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70" disabled={loading || bootstrapping} onClick={() => void reuseUnallocatedBalance()} type="button">
+        <button
+          className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-70"
+          disabled={loading || bootstrapping || isReuseMathInvalid}
+          onClick={() => void reuseUnallocatedBalance()}
+          type="button"
+        >
           {loading ? "Allocating..." : "Use Unallocated Balance"}
         </button>
       </div>

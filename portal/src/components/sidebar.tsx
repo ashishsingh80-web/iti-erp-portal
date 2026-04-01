@@ -61,14 +61,23 @@ export function Sidebar({
       open?: boolean;
     }
   > = {
-    "Control Room": { badge: "CR", open: true },
-    "Admissions & Counselling": { badge: "AC", open: true },
-    "Students & Lifecycle": { badge: "SL", open: true },
-    "Compliance & Certification": { badge: "CC", open: true },
-    "Academic & Campus": { badge: "AP" },
-    "Finance & HR": { badge: "FH" },
-    "Reports & Management": { badge: "RM", open: true },
-    Administration: { badge: "AD" }
+    Dashboard: { badge: "DB", open: true },
+    "Admission Management": { badge: "AM", open: true },
+    "Student Management": { badge: "SM", open: true },
+    "Agent Management": { badge: "AG", open: true },
+    "Scholarship Management": { badge: "SC" },
+    "Fees Management": { badge: "FE" },
+    "Attendance Management": { badge: "AT" },
+    "Academic Management": { badge: "AC" },
+    "Examination Management": { badge: "EX" },
+    "Certificate & Document Management": { badge: "CD" },
+    "Employee / HR Management": { badge: "HR" },
+    "Inventory / Store Management": { badge: "IS" },
+    Accounting: { badge: "FN" },
+    "Communication Module": { badge: "CM" },
+    "Reports & Analytics": { badge: "RA", open: true },
+    "Master Setup": { badge: "MS" },
+    "Legal & Compliance": { badge: "LC" }
   };
 
   const moduleBadge: Record<string, string> = {
@@ -406,13 +415,13 @@ export function Sidebar({
         <p className="text-[11px] uppercase tracking-[0.24em] text-white/45">{t(lang, "Quick Actions")}</p>
         <div className="mt-3 grid gap-2">
           <a className="rounded-2xl bg-white/6 px-4 py-3 text-sm font-semibold text-white/85 transition hover:bg-white/10" href="/modules/management">
-            {t(lang, "Management Dashboard")}
+            {t(lang, "Group Dashboard")}
           </a>
           <a className="rounded-2xl bg-white/6 px-4 py-3 text-sm font-semibold text-white/85 transition hover:bg-white/10" href="/modules/admissions">
             {t(lang, "New Admission")}
           </a>
-          <a className="rounded-2xl bg-white/6 px-4 py-3 text-sm font-semibold text-white/85 transition hover:bg-white/10" href="/modules/reports?report=session-finance">
-            {t(lang, "Session Finance")}
+          <a className="rounded-2xl bg-white/6 px-4 py-3 text-sm font-semibold text-white/85 transition hover:bg-white/10" href="/modules/reports?report=agent-statement">
+            {t(lang, "Agent Reports")}
           </a>
         </div>
       </div>

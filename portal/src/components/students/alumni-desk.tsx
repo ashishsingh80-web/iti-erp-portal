@@ -16,14 +16,27 @@ type AlumniRow = {
 
 export function AlumniDesk() {
   const [rows, setRows] = useState<AlumniRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [processingId, setProcessingId] = useState("");
 
   async function loadRows() {
+    setLoading(true);
+    setError("");
     const response = await fetch("/api/students/alumni");
     const result = await response.json();
-    setRows(result.rows || []);
+    if (!response.ok) {
+      setRows([]);
+      setError(result?.message || "Unable to load alumni candidates");
+      setLoading(false);
+      return;
+    }
+    setRows(Array.isArray(result.rows) ? result.rows : []);
+    setLoading(false);
   }
 
   async function moveToAlumni(studentId: string) {
+    setProcessingId(studentId);
     const response = await fetch("/api/students/alumni", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -32,10 +45,12 @@ export function AlumniDesk() {
     const result = await response.json();
     if (!response.ok) {
       showToast({ kind: "error", title: "Alumni move failed", message: result?.message || "Unable to move student to alumni" });
+      setProcessingId("");
       return;
     }
     showToast({ kind: "success", title: "Student sent to alumni", message: result.student?.studentCode || "" });
     await loadRows();
+    setProcessingId("");
   }
 
   useEffect(() => {
@@ -52,6 +67,7 @@ export function AlumniDesk() {
         </div>
         <span className="chip-neutral">{rows.length} candidates</span>
       </div>
+      {error ? <p className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
 
       <div className="mt-6 overflow-x-auto">
         <table className="w-full table-fixed">
@@ -75,13 +91,18 @@ export function AlumniDesk() {
                 <td className="px-3 py-3 text-slate-700">{row.tradeName}</td>
                 <td className="px-3 py-3 text-slate-700">{row.session} / {row.yearLabel}</td>
                 <td className="px-3 py-3">
-                  <button className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white" onClick={() => void moveToAlumni(row.id)} type="button">
-                    Send To Alumni
+                  <button
+                    className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={processingId === row.id}
+                    onClick={() => void moveToAlumni(row.id)}
+                    type="button"
+                  >
+                    {processingId === row.id ? "Sending..." : "Send To Alumni"}
                   </button>
                 </td>
               </tr>
             ))}
-            {!rows.length ? (
+            {!loading && !rows.length ? (
               <tr>
                 <td className="px-3 py-6 text-sm text-slate-500" colSpan={5}>
                   No alumni candidates found.

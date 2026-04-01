@@ -4,7 +4,7 @@ import { ReportActions } from "@/components/reports/report-actions";
 import { formatInr, looksLikeMoneyField } from "@/lib/currency";
 import { t } from "@/lib/i18n";
 import { readAppLanguage } from "@/lib/i18n-server";
-import { getReportData, getReportSummaries, paginateReportRows, sortReportRows } from "@/lib/services/report-service";
+import { getReportData, getReportSummaries, paginateReportRows, sortReportRows, type ReportKey } from "@/lib/services/report-service";
 
 export async function ReportsDashboard({
   filters
@@ -53,69 +53,20 @@ export async function ReportsDashboard({
     pageSize: filters.pageSize || "10"
   };
 
-  const [
-    summaries,
-    admissionsSummary,
-    feesDue,
-    feesAgingAgentSession,
-    feesAccountsConsistency,
-    financeCashflowMode,
-    financeFeeCollectionTrend,
-    financeAgentCollectionVsPosting,
-    docsPending,
-    prnPending,
-    financeSummary,
-    purchaseRegister,
-    vendorDue,
-    scholarshipStatus,
-    agentStatement,
-    enquiryFollowUp,
-    instituteComparison,
-    tradeDemand,
-    sessionFinance
-  ] = await Promise.all([
-    getReportSummaries(activeFilters),
-    getReportData("admissions-summary", activeFilters),
-    getReportData("fees-due", activeFilters),
-    getReportData("fees-aging-agent-session", activeFilters),
-    getReportData("fees-accounts-consistency", activeFilters),
-    getReportData("finance-cashflow-mode", activeFilters),
-    getReportData("finance-fee-collection-trend", activeFilters),
-    getReportData("finance-agent-collection-vs-posting", activeFilters),
-    getReportData("document-pending", activeFilters),
-    getReportData("prn-scvt-pending", activeFilters),
-    getReportData("finance-summary", activeFilters),
-    getReportData("purchase-register", activeFilters),
-    getReportData("vendor-due", activeFilters),
-    getReportData("scholarship-status", activeFilters),
-    getReportData("agent-statement", activeFilters),
-    getReportData("enquiry-follow-up", activeFilters),
-    getReportData("institute-comparison", activeFilters),
-    getReportData("trade-demand", activeFilters),
-    getReportData("session-finance", activeFilters)
-  ]);
-
-  const allPreviews = [
-    admissionsSummary,
-    feesDue,
-    feesAgingAgentSession,
-    feesAccountsConsistency,
-    financeCashflowMode,
-    financeFeeCollectionTrend,
-    financeAgentCollectionVsPosting,
-    docsPending,
-    prnPending,
-    financeSummary,
-    purchaseRegister,
-    vendorDue,
-    scholarshipStatus,
-    agentStatement,
-    enquiryFollowUp,
-    instituteComparison,
-    tradeDemand,
-    sessionFinance
+  const defaultPreviewKeys: ReportKey[] = [
+    "admissions-summary",
+    "document-pending",
+    "fees-due",
+    "agent-statement",
+    "enquiry-follow-up",
+    "finance-summary"
   ];
-  const previews = (filters.report ? allPreviews.filter((item) => item.key === filters.report) : allPreviews).map((report) => ({
+  const previewKeys = filters.report ? [filters.report as ReportKey] : defaultPreviewKeys;
+  const [summaries, allPreviews] = await Promise.all([
+    getReportSummaries(activeFilters),
+    Promise.all(previewKeys.map((key) => getReportData(key, activeFilters)))
+  ]);
+  const previews = allPreviews.map((report) => ({
     ...report,
     rows: activeFilters.sortBy ? sortReportRows(report.rows, activeFilters.sortBy, activeFilters.sortDir) : report.rows
   }));
@@ -154,29 +105,65 @@ export async function ReportsDashboard({
     { key: "admissions-summary", label: "Admissions Summary" },
     { key: "scholarship-status", label: "Scholarship Status" },
     { key: "agent-statement", label: "Agent Statement" },
+    { key: "attendance-daily", label: "Attendance Daily" },
+    { key: "inventory-stock", label: "Inventory Stock" },
+    { key: "library-issues", label: "Library Open Issues" },
+    { key: "hr-payments", label: "HR Payments" },
+    { key: "communication-log", label: "Communication Logs" },
+    { key: "grievance-cases", label: "Grievance Cases" },
+    { key: "placement-status", label: "Placement Status" },
+    { key: "timetable-plan", label: "Timetable Plan" },
     { key: "enquiry-follow-up", label: "Enquiry Follow-up" },
     { key: "institute-comparison", label: "Institute Comparison" },
     { key: "trade-demand", label: "Trade Demand" },
     { key: "session-finance", label: "Session Finance" }
   ];
-  const reportPresets = [
-    { label: "Fees Due", href: "/modules/reports?report=fees-due" },
-    { label: "Fees Aging", href: "/modules/reports?report=fees-aging-agent-session" },
-    { label: "Fees-Accounts Consistency", href: "/modules/reports?report=fees-accounts-consistency" },
-    { label: "Cashflow by Payment Mode", href: "/modules/reports?report=finance-cashflow-mode" },
-    { label: "Fee Collection Trend", href: "/modules/reports?report=finance-fee-collection-trend" },
-    { label: "Agent Collection vs Posting", href: "/modules/reports?report=finance-agent-collection-vs-posting" },
-    { label: "Docs Pending", href: "/modules/reports?report=document-pending" },
-    { label: "Scholarship Query", href: "/modules/reports?report=scholarship-status&scholarshipStatus=QUERY_BY_DEPARTMENT" },
-    { label: "PRN / SCVT Pending", href: "/modules/reports?report=prn-scvt-pending" },
-    { label: "Admissions Queue", href: "/modules/reports?report=admissions-summary" },
-    { label: "Finance Summary", href: "/modules/reports?report=finance-summary" },
-    { label: "Vendor Due", href: "/modules/reports?report=vendor-due" },
-    { label: "Agent Statement", href: "/modules/reports?report=agent-statement" },
-    { label: "Enquiry Follow-up", href: "/modules/reports?report=enquiry-follow-up" },
-    { label: "Institute Comparison", href: "/modules/reports?report=institute-comparison" },
-    { label: "Trade Demand", href: "/modules/reports?report=trade-demand" },
-    { label: "Session Finance", href: "/modules/reports?report=session-finance" }
+  const reportPresetGroups = [
+    {
+      label: "Daily Operations",
+      items: [
+        { label: "Admissions Queue", href: "/modules/reports?report=admissions-summary" },
+        { label: "Enquiry Follow-up", href: "/modules/reports?report=enquiry-follow-up" },
+        { label: "Attendance Daily", href: "/modules/reports?report=attendance-daily" },
+        { label: "Communication Logs", href: "/modules/reports?report=communication-log" },
+        { label: "Grievance Cases", href: "/modules/reports?report=grievance-cases" }
+      ]
+    },
+    {
+      label: "Compliance & Registration",
+      items: [
+        { label: "Docs Pending", href: "/modules/reports?report=document-pending" },
+        { label: "Scholarship Query", href: "/modules/reports?report=scholarship-status&scholarshipStatus=QUERY_BY_DEPARTMENT" },
+        { label: "PRN / SCVT Pending", href: "/modules/reports?report=prn-scvt-pending" },
+        { label: "Timetable Plan", href: "/modules/reports?report=timetable-plan" }
+      ]
+    },
+    {
+      label: "Finance & Accounts",
+      items: [
+        { label: "Fees Due", href: "/modules/reports?report=fees-due" },
+        { label: "Fees Aging", href: "/modules/reports?report=fees-aging-agent-session" },
+        { label: "Fees-Accounts Consistency", href: "/modules/reports?report=fees-accounts-consistency" },
+        { label: "Cashflow by Payment Mode", href: "/modules/reports?report=finance-cashflow-mode" },
+        { label: "Fee Collection Trend", href: "/modules/reports?report=finance-fee-collection-trend" },
+        { label: "Agent Collection vs Posting", href: "/modules/reports?report=finance-agent-collection-vs-posting" },
+        { label: "Finance Summary", href: "/modules/reports?report=finance-summary" },
+        { label: "Vendor Due", href: "/modules/reports?report=vendor-due" },
+        { label: "Agent Statement", href: "/modules/reports?report=agent-statement" },
+        { label: "HR Payments", href: "/modules/reports?report=hr-payments" }
+      ]
+    },
+    {
+      label: "Resources & Outcomes",
+      items: [
+        { label: "Inventory Stock", href: "/modules/reports?report=inventory-stock" },
+        { label: "Library Open Issues", href: "/modules/reports?report=library-issues" },
+        { label: "Placement Status", href: "/modules/reports?report=placement-status" },
+        { label: "Institute Comparison", href: "/modules/reports?report=institute-comparison" },
+        { label: "Trade Demand", href: "/modules/reports?report=trade-demand" },
+        { label: "Session Finance", href: "/modules/reports?report=session-finance" }
+      ]
+    }
   ];
   const totalMatchedRows = previews.reduce((sum, report) => sum + report.rows.length, 0);
   const currentPage = Math.max(Number(activeFilters.page || "1"), 1);
@@ -266,6 +253,14 @@ export async function ReportsDashboard({
             <option value="admissions-summary">Admissions Summary</option>
             <option value="scholarship-status">Scholarship Status</option>
             <option value="agent-statement">Agent Statement</option>
+            <option value="attendance-daily">Attendance Daily</option>
+            <option value="inventory-stock">Inventory Stock</option>
+            <option value="library-issues">Library Open Issues</option>
+            <option value="hr-payments">HR Payments</option>
+            <option value="communication-log">Communication Logs</option>
+            <option value="grievance-cases">Grievance Cases</option>
+            <option value="placement-status">Placement Status</option>
+            <option value="timetable-plan">Timetable Plan</option>
             <option value="enquiry-follow-up">Enquiry Follow-up</option>
             <option value="institute-comparison">Institute Comparison</option>
             <option value="trade-demand">Trade Demand</option>
@@ -377,31 +372,35 @@ export async function ReportsDashboard({
           )}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <span className="mr-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Saved Reports</span>
-          {reportPresets.map((preset) => {
-            const presetQuery = preset.href.split("?")[1] || "";
-            const isActive =
-              !!presetQuery &&
-              presetQuery.split("&").every((part) => {
-                const [key, value] = part.split("=");
-                return filters[key as keyof typeof filters] === value;
-              });
+        <div className="mt-5 space-y-3">
+          {reportPresetGroups.map((group) => (
+            <div key={group.label} className="flex flex-wrap items-center gap-2">
+              <span className="mr-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{group.label}</span>
+              {group.items.map((preset) => {
+                const presetQuery = preset.href.split("?")[1] || "";
+                const isActive =
+                  !!presetQuery &&
+                  presetQuery.split("&").every((part) => {
+                    const [key, value] = part.split("=");
+                    return filters[key as keyof typeof filters] === value;
+                  });
 
-            return (
-              <a
-                key={preset.label}
-                className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
-                  isActive
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-                href={preset.href}
-              >
-                {preset.label}
-              </a>
-            );
-          })}
+                return (
+                  <a
+                    key={preset.label}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                      isActive
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                    href={preset.href}
+                  >
+                    {preset.label}
+                  </a>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </section>
 

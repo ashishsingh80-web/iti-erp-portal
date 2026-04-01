@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { UserRole } from "@prisma/client";
+import { findInvalidActionKeysForModules } from "@/lib/access";
 import { hashPassword, requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/services/audit-service";
@@ -47,15 +48,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
     const nextRole =
       typeof payload.role === "string" && payload.role in UserRole ? (payload.role as UserRole) : undefined;
+    const hasCustomModuleAccess = Boolean(payload.hasCustomModuleAccess);
+    const hasCustomActionAccess = Boolean(payload.hasCustomActionAccess);
+    const allowedModuleSlugs = payload.allowedModuleSlugs || [];
+    const allowedActionKeys = payload.allowedActionKeys || [];
+    if (hasCustomModuleAccess && hasCustomActionAccess) {
+      const invalidActionKeys = findInvalidActionKeysForModules(allowedActionKeys, allowedModuleSlugs);
+      if (invalidActionKeys.length) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: `Action keys must match allowed modules. Invalid keys: ${invalidActionKeys.join(", ")}`
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(nextRole ? { role: nextRole } : {}),
-        hasCustomModuleAccess: Boolean(payload.hasCustomModuleAccess),
-        allowedModuleSlugs: payload.allowedModuleSlugs || [],
-        hasCustomActionAccess: Boolean(payload.hasCustomActionAccess),
-        allowedActionKeys: payload.allowedActionKeys || [],
+        hasCustomModuleAccess,
+        allowedModuleSlugs,
+        hasCustomActionAccess,
+        allowedActionKeys,
         ...(typeof payload.isActive === "boolean" ? { isActive: payload.isActive } : {}),
         ...(payload.password?.trim() ? { passwordHash: hashPassword(payload.password.trim()) } : {})
       }

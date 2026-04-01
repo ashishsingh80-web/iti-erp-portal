@@ -78,7 +78,8 @@ const actionAccessMatrix: Record<UserRole, string[]> = {
     "management:view",
     "agents:view",
     "agents:add",
-    "agents:edit"
+    "agents:edit",
+    "agents:delete"
   ],
   DOCUMENT_VERIFIER: [
     "dashboard:view",
@@ -189,6 +190,15 @@ const actionAccessMatrix: Record<UserRole, string[]> = {
 
 export function buildActionKey(moduleSlug: string, action: ModuleAction) {
   return `${moduleSlug}:${action}`;
+}
+
+export function findInvalidActionKeysForModules(actionKeys: string[], moduleSlugs: string[]) {
+  if (!moduleSlugs.length || moduleSlugs.includes("*")) return [];
+  const allowed = new Set(moduleSlugs);
+  return actionKeys.filter((key) => {
+    const [moduleSlug] = key.split(":");
+    return !allowed.has(moduleSlug);
+  });
 }
 
 function buildActionKeys(moduleSlugs: string[], actions: ModuleAction[]) {

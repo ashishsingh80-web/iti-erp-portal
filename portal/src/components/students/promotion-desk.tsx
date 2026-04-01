@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { showToast } from "@/lib/toast";
 
@@ -17,16 +18,26 @@ type PromotionRow = {
 export function PromotionDesk() {
   const [rows, setRows] = useState<PromotionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [processingId, setProcessingId] = useState("");
 
   async function loadRows() {
     setLoading(true);
+    setError("");
     const response = await fetch("/api/students/promotions");
     const result = await response.json();
-    setRows(result.rows || []);
+    if (!response.ok) {
+      setRows([]);
+      setError(result?.message || "Unable to load promotion candidates");
+      setLoading(false);
+      return;
+    }
+    setRows(Array.isArray(result.rows) ? result.rows : []);
     setLoading(false);
   }
 
   async function promote(studentId: string) {
+    setProcessingId(studentId);
     const response = await fetch("/api/students/promotions", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -35,10 +46,12 @@ export function PromotionDesk() {
     const result = await response.json();
     if (!response.ok) {
       showToast({ kind: "error", title: "Promotion not completed", message: result?.message || "Unable to promote student" });
+      setProcessingId("");
       return;
     }
     showToast({ kind: "success", title: "Student promoted", message: result.student?.studentCode || "" });
     await loadRows();
+    setProcessingId("");
   }
 
   useEffect(() => {
@@ -53,8 +66,14 @@ export function PromotionDesk() {
           <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-slate-900">Promote 1st Year To 2nd Year</h3>
           <p className="mt-2 text-sm text-slate-600">Move current 1st year students into next-session 2nd year records for 2-year trades.</p>
         </div>
-        <span className="chip-success">{rows.length} eligible</span>
+        <div className="flex items-center gap-2">
+          <Link className="chip-neutral" href="/modules/alumni">
+            Open Alumni Desk
+          </Link>
+          <span className="chip-success">{rows.length} eligible</span>
+        </div>
       </div>
+      {error ? <p className="mt-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
 
       <div className="mt-6 overflow-x-auto">
         <table className="w-full table-fixed">
@@ -80,8 +99,13 @@ export function PromotionDesk() {
                 <td className="px-3 py-3 text-slate-700">{row.currentSession} / {row.currentYear}</td>
                 <td className="px-3 py-3 text-slate-700">{row.nextSession} / 2nd</td>
                 <td className="px-3 py-3">
-                  <button className="rounded-xl bg-emerald-800 px-3 py-2 text-xs font-semibold text-white" onClick={() => void promote(row.id)} type="button">
-                    Promote
+                  <button
+                    className="rounded-xl bg-emerald-800 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={processingId === row.id}
+                    onClick={() => void promote(row.id)}
+                    type="button"
+                  >
+                    {processingId === row.id ? "Promoting..." : "Promote"}
                   </button>
                 </td>
               </tr>

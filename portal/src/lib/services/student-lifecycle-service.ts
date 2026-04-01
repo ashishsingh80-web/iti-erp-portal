@@ -2,15 +2,36 @@ import { PaymentStatus, ScholarshipStatus, StudentArchiveCategory, StudentLifecy
 import { prisma } from "@/lib/prisma";
 import { createAuditLog } from "@/lib/services/audit-service";
 
-function nextTwoYearSession(session: string) {
-  const match = session.match(/^(\d{2})-(\d{2})$/);
-  if (!match) {
-    throw new Error("Session format is invalid");
-  }
+function normalizeYearToken(token: string) {
+  const value = Number(token);
+  if (!Number.isFinite(value)) throw new Error("Session format is invalid");
+  if (token.length === 4) return value;
+  if (token.length === 2) return 2000 + value;
+  throw new Error("Session format is invalid");
+}
 
-  const start = Number(match[1]) + 1;
-  const end = Number(match[2]) + 1;
-  return `${String(start).padStart(2, "0")}-${String(end).padStart(2, "0")}`;
+function formatYearToken(value: number, length: number) {
+  if (length === 4) return String(value);
+  if (length === 2) return String(value % 100).padStart(2, "0");
+  return String(value);
+}
+
+function nextTwoYearSession(session: string) {
+  const normalized = session.trim();
+  const match = normalized.match(/^(\d{2,4})-(\d{2,4})$/);
+  if (!match) throw new Error("Session format is invalid");
+
+  const startToken = match[1];
+  const endToken = match[2];
+  const nextStart = normalizeYearToken(startToken) + 1;
+  const nextEnd = normalizeYearToken(endToken) + 1;
+  return `${formatYearToken(nextStart, startToken.length)}-${formatYearToken(nextEnd, endToken.length)}`;
+}
+
+function isOneYearTrade(duration: string | null, tradeName: string) {
+  const parsedDuration = Number((duration || "").match(/\d+/)?.[0] || 0);
+  if (parsedDuration > 0) return parsedDuration <= 1;
+  return tradeName.trim().toLowerCase() === "dress-making";
 }
 
 export async function listPromotionCandidates() {
@@ -19,12 +40,7 @@ export async function listPromotionCandidates() {
       deletedAt: null,
       lifecycleStage: StudentLifecycleStage.ACTIVE,
       yearLabel: "1st",
-      trade: {
-        isActive: true,
-        name: {
-          not: "Dress-Making"
-        }
-      }
+      trade: { isActive: true }
     },
     include: {
       institute: true,
@@ -33,7 +49,9 @@ export async function listPromotionCandidates() {
     orderBy: [{ session: "asc" }, { fullName: "asc" }]
   });
 
-  return rows.map((row) => ({
+  return rows
+    .filter((row) => !isOneYearTrade(row.trade.duration, row.trade.name))
+    .map((row) => ({
     id: row.id,
     studentCode: row.studentCode,
     fullName: row.fullName,
@@ -42,7 +60,7 @@ export async function listPromotionCandidates() {
     currentSession: row.session,
     nextSession: nextTwoYearSession(row.session),
     currentYear: row.yearLabel
-  }));
+    }));
 }
 
 export async function promoteStudentToSecondYear(studentId: string, currentUserId?: string | null) {
@@ -53,7 +71,9 @@ export async function promoteStudentToSecondYear(studentId: string, currentUserI
 
   if (!student || student.deletedAt) throw new Error("Student not found");
   if (student.yearLabel !== "1st") throw new Error("Only 1st year students can be promoted");
-  if (student.trade.name === "Dress-Making") throw new Error("1-year trade students cannot be promoted to 2nd year");
+  if (isOneYearTrade(student.trade.duration, student.trade.name)) {
+    throw new Error("1-year trade students cannot be promoted to 2nd year");
+  }
 
   const updated = await prisma.student.update({
     where: { id: studentId },

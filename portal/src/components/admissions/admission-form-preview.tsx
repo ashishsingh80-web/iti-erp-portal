@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { AdmissionsExpandControls } from "@/components/admissions/admissions-expand-controls";
 import { t } from "@/lib/i18n";
 import { showToast } from "@/lib/toast";
 import type { SelectOption } from "@/lib/types";
@@ -415,18 +416,23 @@ export function AdmissionFormPreview() {
   return (
     <section className="surface p-6">
       <div className="mb-6">
-        <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Admissions")}</p>
-        <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "Admission Form Structure")}</h3>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          {t(
-            lang,
-            "This preview shows the complete web-portal admission form structure, including parent Aadhaar and 10th-pass eligibility capture."
-          )}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Admissions")}</p>
+            <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "Admission Form Structure")}</h3>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+              {t(
+                lang,
+                "This preview shows the complete web-portal admission form structure, including parent Aadhaar and 10th-pass eligibility capture."
+              )}
+            </p>
+          </div>
+          <AdmissionsExpandControls targetId="admission-form-expand-zone" />
+        </div>
       </div>
 
       <form className="space-y-6" onSubmit={handleSubmit}>
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2" id="admission-form-expand-zone">
           <div className="space-y-4">
             <CollapsibleAdmissionSection
               title={t(lang, "Admission Basics")}

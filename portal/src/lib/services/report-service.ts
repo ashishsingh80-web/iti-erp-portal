@@ -1,7 +1,11 @@
-import { EnquiryStatus, PaymentStatus, ScholarshipStatus, StudentStatus, VerificationStatus } from "@prisma/client";
+import { AttendancePersonType, EnquiryStatus, LibraryIssueStatus, PaymentStatus, ScholarshipStatus, StudentStatus, VerificationStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { listCommunicationDeskData } from "@/lib/services/communication-service";
 import { getPeriodicFinanceSummary } from "@/lib/services/accounts-service";
+import { listGrievanceDeskData } from "@/lib/services/grievance-service";
+import { listPlacementDeskData } from "@/lib/services/placement-service";
 import { getPurchaseRegister } from "@/lib/services/vendor-service";
+import { listTimetableRows } from "@/lib/services/timetable-service";
 
 export const reportKeys = [
   "admissions-summary",
@@ -18,6 +22,14 @@ export const reportKeys = [
   "agent-statement",
   "scholarship-status",
   "prn-scvt-pending",
+  "attendance-daily",
+  "inventory-stock",
+  "library-issues",
+  "hr-payments",
+  "communication-log",
+  "grievance-cases",
+  "placement-status",
+  "timetable-plan",
   "enquiry-follow-up",
   "institute-comparison",
   "trade-demand",
@@ -247,7 +259,15 @@ export async function getReportSummaries(filters: ReportFilters = {}) {
     agentCases,
     scholarshipQuery,
     prnPending,
-    enquiryDue
+    enquiryDue,
+    attendanceRows,
+    inventoryItems,
+    libraryOpenIssues,
+    hrPayments,
+    communicationLogs,
+    grievanceCases,
+    placementCases,
+    timetableSlots
   ] = await Promise.all([
     prisma.student.count({
       where: {
@@ -351,6 +371,67 @@ export async function getReportSummaries(filters: ReportFilters = {}) {
     }),
     prisma.enquiry.count({
       where: buildEnquiryWhere(filters, enquiryTradeIds, true)
+    }),
+    prisma.attendanceRecord.count({
+      where: {
+        personType: AttendancePersonType.STUDENT,
+        student: studentWhere
+      }
+    }),
+    prisma.inventoryItem.count(),
+    prisma.libraryIssue.count({
+      where: {
+        status: LibraryIssueStatus.ISSUED
+      }
+    }),
+    prisma.hrPayment.count({
+      where: {
+        ...(filters.dateFrom || filters.dateTo ? buildDateRange("paymentDate", filters) : {})
+      }
+    }),
+    prisma.communicationLog.count({
+      where: {
+        ...(filters.search
+          ? {
+              OR: [
+                { targetName: { contains: filters.search.trim(), mode: "insensitive" } },
+                { targetMobile: { contains: filters.search.trim() } },
+                { targetEmail: { contains: filters.search.trim(), mode: "insensitive" } }
+              ]
+            }
+          : {})
+      }
+    }),
+    prisma.grievanceCase.count({
+      where: {
+        ...(filters.search
+          ? {
+              OR: [
+                { grievanceNo: { contains: filters.search.trim(), mode: "insensitive" } },
+                { title: { contains: filters.search.trim(), mode: "insensitive" } }
+              ]
+            }
+          : {})
+      }
+    }),
+    (prisma as any).placementRecord.count({
+      where: {
+        ...(filters.search
+          ? {
+              OR: [
+                { employerName: { contains: filters.search.trim(), mode: "insensitive" } },
+                { student: { fullName: { contains: filters.search.trim(), mode: "insensitive" } }
+                }
+              ]
+            }
+          : {})
+      }
+    }),
+    prisma.timetableEntry.count({
+      where: {
+        ...(filters.session ? { session: filters.session } : {}),
+        ...(filters.yearLabel ? { yearLabel: filters.yearLabel } : {})
+      }
     })
   ]);
 
@@ -457,6 +538,54 @@ export async function getReportSummaries(filters: ReportFilters = {}) {
       title: "Enquiry Follow-up Due",
       value: String(enquiryDue),
       helper: "Callbacks due today or earlier"
+    },
+    {
+      key: "attendance-daily" as const,
+      title: "Attendance Records",
+      value: String(attendanceRows),
+      helper: "Student attendance records in scope"
+    },
+    {
+      key: "inventory-stock" as const,
+      title: "Inventory Items",
+      value: String(inventoryItems),
+      helper: "Store/workshop stock master entries"
+    },
+    {
+      key: "library-issues" as const,
+      title: "Library Open Issues",
+      value: String(libraryOpenIssues),
+      helper: "Books currently issued and pending return"
+    },
+    {
+      key: "hr-payments" as const,
+      title: "HR Payments",
+      value: String(hrPayments),
+      helper: "Salary/HR payment entries in period"
+    },
+    {
+      key: "communication-log" as const,
+      title: "Communication Logs",
+      value: String(communicationLogs),
+      helper: "Prepared/sent communication entries"
+    },
+    {
+      key: "grievance-cases" as const,
+      title: "Grievance Cases",
+      value: String(grievanceCases),
+      helper: "Complaint and grievance register"
+    },
+    {
+      key: "placement-status" as const,
+      title: "Placement Cases",
+      value: String(placementCases),
+      helper: "Placement/apprenticeship records"
+    },
+    {
+      key: "timetable-plan" as const,
+      title: "Timetable Slots",
+      value: String(timetableSlots),
+      helper: "Published timetable entry count"
     },
     {
       key: "institute-comparison" as const,
@@ -1263,6 +1392,248 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
           _studentId: item.student.id,
           _detailHref: `/students/${item.student.id}`,
           _detailLabel: "Open Student"
+        }))
+      };
+    }
+    case "attendance-daily": {
+      const rows = await prisma.attendanceRecord.findMany({
+        where: {
+          personType: AttendancePersonType.STUDENT,
+          student: studentWhere,
+          ...(filters.dateFrom || filters.dateTo ? buildDateRange("recordDate", filters) : {})
+        },
+        include: {
+          student: {
+            include: {
+              institute: true,
+              trade: true
+            }
+          }
+        },
+        orderBy: [{ recordDate: "desc" }, { createdAt: "desc" }],
+        take: 100
+      });
+
+      return {
+        key: report,
+        title: "Attendance Daily Report",
+        description: "Student attendance entries by date with status and check-in/check-out timeline.",
+        headers: ["Date", "Student Code", "Student Name", "Institute", "Trade", "Status", "Check In", "Check Out", "Note"],
+        rows: rows.map((item) => ({
+          Date: formatDate(item.recordDate),
+          "Student Code": item.student?.studentCode || "",
+          "Student Name": item.student?.fullName || "",
+          Institute: item.student?.institute?.name || "",
+          Trade: item.student?.trade?.name || "",
+          Status: item.status,
+          "Check In": item.checkInAt ? new Date(item.checkInAt).toISOString() : "",
+          "Check Out": item.checkOutAt ? new Date(item.checkOutAt).toISOString() : "",
+          Note: item.note || "",
+          _studentId: item.student?.id || "",
+          _detailHref: item.student?.id ? `/students/${item.student.id}` : "",
+          _detailLabel: item.student?.id ? "Open Student" : ""
+        }))
+      };
+    }
+    case "inventory-stock": {
+      const rows = await prisma.inventoryItem.findMany({
+        include: {
+          issues: {
+            where: {
+              status: {
+                in: ["ISSUED", "PARTIAL_RETURNED"]
+              }
+            }
+          }
+        },
+        orderBy: [{ department: "asc" }, { itemName: "asc" }],
+        take: 150
+      });
+
+      return {
+        key: report,
+        title: "Inventory Stock Report",
+        description: "Stock availability, reorder risk, and open issue counts for workshop/store items.",
+        headers: ["Item Code", "Item Name", "Department", "Current Stock", "Reorder Level", "Open Issues", "Stock Status"],
+        rows: rows.map((item) => {
+          const currentStock = Number(item.currentStock || 0);
+          const reorderLevel = Number(item.reorderLevel || 0);
+          const status = currentStock <= 0 ? "OUT_OF_STOCK" : reorderLevel > 0 && currentStock <= reorderLevel ? "LOW_STOCK" : "OK";
+          return {
+            "Item Code": item.itemCode,
+            "Item Name": item.itemName,
+            Department: item.department,
+            "Current Stock": item.currentStock.toString(),
+            "Reorder Level": item.reorderLevel.toString(),
+            "Open Issues": String(item.issues.length),
+            "Stock Status": status,
+            _detailHref: "/modules/inventory",
+            _detailLabel: "Open Inventory"
+          };
+        })
+      };
+    }
+    case "library-issues": {
+      const rows = await prisma.libraryIssue.findMany({
+        where: {
+          status: LibraryIssueStatus.ISSUED,
+          student: studentWhere,
+          ...(filters.dateFrom || filters.dateTo ? buildDateRange("issueDate", filters) : {})
+        },
+        include: {
+          student: {
+            include: {
+              institute: true,
+              trade: true
+            }
+          },
+          book: true
+        },
+        orderBy: [{ issueDate: "desc" }],
+        take: 100
+      });
+
+      return {
+        key: report,
+        title: "Library Open Issues Report",
+        description: "Books currently issued to students and pending return.",
+        headers: ["Issue Date", "Student Code", "Student Name", "Book", "Accession No", "Expected Return", "Status"],
+        rows: rows.map((item) => ({
+          "Issue Date": formatDate(item.issueDate),
+          "Student Code": item.student.studentCode,
+          "Student Name": item.student.fullName,
+          Book: item.book.title,
+          "Accession No": item.book.accessionNumber,
+          "Expected Return": formatDate(item.expectedReturnDate),
+          Status: item.status,
+          _studentId: item.student.id,
+          _detailHref: `/students/${item.student.id}`,
+          _detailLabel: "Open Student"
+        }))
+      };
+    }
+    case "hr-payments": {
+      const rows = await prisma.hrPayment.findMany({
+        where: {
+          ...(filters.dateFrom || filters.dateTo ? buildDateRange("paymentDate", filters) : {})
+        },
+        include: {
+          staff: true
+        },
+        orderBy: [{ paymentDate: "desc" }],
+        take: 100
+      });
+
+      return {
+        key: report,
+        title: "HR Payments Report",
+        description: "Salary and HR-linked payment records with gross, deductions, and net amount.",
+        headers: ["Payment Date", "Employee Code", "Staff Name", "Payment Month", "Gross", "Deductions", "Net", "Mode", "Reference"],
+        rows: rows.map((item) => ({
+          "Payment Date": formatDate(item.paymentDate),
+          "Employee Code": item.staff.employeeCode,
+          "Staff Name": item.staff.fullName,
+          "Payment Month": item.paymentMonth || "",
+          Gross: item.grossAmount.toString(),
+          Deductions: item.deductionsAmount.toString(),
+          Net: item.netAmount.toString(),
+          Mode: item.paymentMode,
+          Reference: item.referenceNo || "",
+          _detailHref: "/modules/hr",
+          _detailLabel: "Open HR"
+        }))
+      };
+    }
+    case "communication-log": {
+      const data = await listCommunicationDeskData(filters.search || "");
+      return {
+        key: report,
+        title: "Communication Log Report",
+        description: "Recent communication logs with channel, target, and delivery status.",
+        headers: ["Created At", "Category", "Channel", "Target Name", "Target Mobile", "Target Email", "Status", "Created By"],
+        rows: data.logs.map((item) => ({
+          "Created At": item.createdAt.slice(0, 10),
+          Category: item.category || "",
+          Channel: item.channel,
+          "Target Name": item.targetName,
+          "Target Mobile": item.targetMobile || "",
+          "Target Email": item.targetEmail || "",
+          Status: item.status,
+          "Created By": item.createdBy,
+          _detailHref: "/modules/communication",
+          _detailLabel: "Open Communication"
+        }))
+      };
+    }
+    case "grievance-cases": {
+      const data = await listGrievanceDeskData(filters.search || "", "");
+      return {
+        key: report,
+        title: "Grievance Cases Report",
+        description: "Case-level grievance tracking by priority, status, and assignee.",
+        headers: ["Created", "Grievance No", "Category", "Title", "Priority", "Status", "Assigned To", "Target"],
+        rows: data.grievances.map((item) => ({
+          Created: item.createdAt,
+          "Grievance No": item.grievanceNo,
+          Category: item.category,
+          Title: item.title,
+          Priority: item.priority,
+          Status: item.status,
+          "Assigned To": item.assignedToName || "",
+          Target: item.studentName || item.staffName || item.targetType,
+          _detailHref: "/modules/grievance",
+          _detailLabel: "Open Grievance"
+        }))
+      };
+    }
+    case "placement-status": {
+      const data = await listPlacementDeskData(filters.search || "", "");
+      return {
+        key: report,
+        title: "Placement Status Report",
+        description: "Student placement and apprenticeship progression overview.",
+        headers: ["Student Code", "Student Name", "Employer", "Designation", "Placement Status", "Apprenticeship", "Offer Date", "Joining Date", "Salary"],
+        rows: data.placements.map((item: any) => ({
+          "Student Code": item.studentCode,
+          "Student Name": item.studentName,
+          Employer: item.employerName,
+          Designation: item.designation || "",
+          "Placement Status": item.placementStatus,
+          Apprenticeship: item.apprenticeshipStatus,
+          "Offer Date": item.offerDate || "",
+          "Joining Date": item.joiningDate || "",
+          Salary: item.salaryOffered || "",
+          _detailHref: "/modules/placement",
+          _detailLabel: "Open Placement"
+        }))
+      };
+    }
+    case "timetable-plan": {
+      const rows = await listTimetableRows({
+        instituteCode: filters.instituteCode || "",
+        tradeValue: filters.tradeValue || "",
+        session: filters.session || "",
+        yearLabel: filters.yearLabel || ""
+      });
+      return {
+        key: report,
+        title: "Timetable Plan Report",
+        description: "Day-wise class schedule with instructor, room, and practical/theory labeling.",
+        headers: ["Institute", "Trade", "Session", "Year", "Day", "Start", "End", "Subject", "Instructor", "Room", "Type"],
+        rows: rows.map((item) => ({
+          Institute: item.instituteCode,
+          Trade: item.tradeName,
+          Session: item.session,
+          Year: item.yearLabel,
+          Day: item.dayOfWeek,
+          Start: item.startTime,
+          End: item.endTime,
+          Subject: item.subjectTitle,
+          Instructor: item.instructorName || "",
+          Room: item.roomLabel || "",
+          Type: item.isPractical ? "PRACTICAL" : "THEORY",
+          _detailHref: "/modules/timetable",
+          _detailLabel: "Open Timetable"
         }))
       };
     }
