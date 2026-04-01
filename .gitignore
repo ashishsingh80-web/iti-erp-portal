@@ -3,3 +3,7 @@ node_modules
 .env
 .env.local
 .DS_Store
+
+# Serwist (generated at build)
+portal/public/sw.js
+portal/public/swe-worker*
