@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         {user ? (
           <>
             <div className="mx-auto grid min-h-screen max-w-[1700px] items-start gap-6 px-4 py-6 print:block print:max-w-none print:px-0 print:py-0 md:grid-cols-[320px_minmax(0,1fr)] md:px-6">
-              <div className="hidden md:block">
+              <div className="hidden min-h-0 md:block md:self-start">
                 <Sidebar badges={sidebarBadges} lang={lang} user={user} />
               </div>
               <main className="space-y-6 overflow-visible print:space-y-0">

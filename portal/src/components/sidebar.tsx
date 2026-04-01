@@ -178,7 +178,7 @@ export function Sidebar({
   }
 
   return (
-    <aside className="relative z-20 block w-full shrink-0 rounded-[2rem] border border-white/60 bg-slate-950 px-5 py-6 text-white shadow-2xl print:hidden md:w-[320px] md:max-w-[320px] md:sticky md:top-6 md:max-h-[calc(100vh-3rem)] md:self-start md:overflow-y-auto">
+    <aside className="relative z-20 block min-h-0 w-full shrink-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[2rem] border border-white/60 bg-slate-950 px-5 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] text-white shadow-2xl print:hidden md:sticky md:top-6 md:max-h-[calc(100dvh-3rem)] md:w-[320px] md:max-w-[320px] md:self-start">
       <div className="rounded-[1.75rem] bg-white/5 p-4">
         <div className="flex flex-col items-center text-center">
           <div className="shrink-0 leading-none">

@@ -21,13 +21,6 @@ export default async function LoginPage() {
           <p className="mt-5 max-w-2xl text-sm leading-6 text-white/85">
             Staff can now log in with their own portal access. Each role sees only the modules needed for that desk.
           </p>
-          <div className="mt-8 rounded-3xl border border-white/20 bg-white/10 p-5 text-sm text-white/90">
-            Default admin login:
-            <div className="mt-3 space-y-1 font-semibold">
-              <p>Email: admin@itierp.local</p>
-              <p>Password: Admin@123</p>
-            </div>
-          </div>
         </section>
 
         <section className="surface p-8">
