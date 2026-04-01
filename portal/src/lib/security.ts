@@ -6,14 +6,17 @@ export function maskAadhaar(value: string) {
   return `XXXX-XXXX-${sanitized.slice(-4)}`;
 }
 
-const AADHAAR_ENCRYPTION_KEY = process.env.AADHAAR_ENCRYPTION_KEY;
-const AADHAAR_ENCRYPTION_KEY_EFFECTIVE = AADHAAR_ENCRYPTION_KEY || "development-only-key";
-if (!AADHAAR_ENCRYPTION_KEY && process.env.NODE_ENV === "production") {
-  throw new Error("AADHAAR_ENCRYPTION_KEY must be set in production");
+/** Resolved when encrypt runs — not at import time — so `next build` can run without this env var. */
+function getAadhaarKeyMaterial(): string {
+  const key = process.env.AADHAAR_ENCRYPTION_KEY;
+  if (!key && process.env.NODE_ENV === "production") {
+    throw new Error("AADHAAR_ENCRYPTION_KEY must be set in production");
+  }
+  return key || "development-only-key";
 }
 
 export function encryptSensitiveValue(value: string) {
-  const key = createHash("sha256").update(AADHAAR_ENCRYPTION_KEY_EFFECTIVE).digest();
+  const key = createHash("sha256").update(getAadhaarKeyMaterial()).digest();
   const iv = randomBytes(16);
   const cipher = createCipheriv("aes-256-cbc", key, iv);
 

@@ -50,6 +50,8 @@ export function LoginForm() {
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <Input
+        id="portal-login-email"
+        name="email"
         label="Email"
         required
         autoComplete="username"
@@ -59,6 +61,8 @@ export function LoginForm() {
         value={email}
       />
       <Input
+        id="portal-login-password"
+        name="password"
         label="Password"
         required
         autoComplete="current-password"

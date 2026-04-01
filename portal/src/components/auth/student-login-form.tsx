@@ -49,6 +49,8 @@ export function StudentLoginForm() {
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <Input
+        id="student-login-code"
+        name="studentCode"
         label="Student Code"
         required
         autoComplete="username"
@@ -57,6 +59,8 @@ export function StudentLoginForm() {
         value={studentCode}
       />
       <Input
+        id="student-login-dob"
+        name="dateOfBirth"
         label="Date of Birth"
         required
         type="date"

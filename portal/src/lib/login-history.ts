@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
+import type { PortalLoginHistory, PortalLoginLockout } from "@prisma/client";
+import { PortalLoginHistoryEventType, PortalLoginLockType } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
 export type LoginHistoryEntry = {
   id: string;
@@ -22,13 +23,9 @@ export type LoginLockState = {
   updatedAt: string;
 };
 
-type LoginHistoryStore = {
-  entries: LoginHistoryEntry[];
-  lockouts: Record<string, LoginLockState>;
-  updatedAt: string | null;
-};
-
-const loginHistoryPath = path.join(process.cwd(), "data", "login-history.json");
+const MAX_ENTRIES = 500;
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_WINDOW_MS = 1000 * 60 * 30;
 
 function inferDeviceLabel(userAgent: string) {
   const agent = userAgent.toLowerCase();
@@ -42,30 +39,52 @@ function inferDeviceLabel(userAgent: string) {
   return "Browser Device";
 }
 
-async function readStore(): Promise<LoginHistoryStore> {
-  try {
-    const raw = await readFile(loginHistoryPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<LoginHistoryStore>;
-    return {
-      entries: Array.isArray(parsed.entries) ? (parsed.entries as LoginHistoryEntry[]) : [],
-      lockouts:
-        parsed.lockouts && typeof parsed.lockouts === "object" ? (parsed.lockouts as Record<string, LoginLockState>) : {},
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null
-    };
-  } catch {
-    return { entries: [], lockouts: {}, updatedAt: null };
-  }
+function rowToEntry(row: PortalLoginHistory): LoginHistoryEntry {
+  return {
+    id: row.id,
+    eventType: row.eventType as LoginHistoryEntry["eventType"],
+    userId: row.userId,
+    userName: row.userName,
+    userEmail: row.userEmail,
+    userRole: row.userRole,
+    ipAddress: row.ipAddress,
+    userAgent: row.userAgent,
+    deviceLabel: row.deviceLabel,
+    createdAt: row.createdAt.toISOString()
+  };
 }
 
-async function saveStore(entries: LoginHistoryEntry[], lockouts: Record<string, LoginLockState>) {
-  const payload: LoginHistoryStore = {
-    entries,
-    lockouts,
-    updatedAt: new Date().toISOString()
+function rowToLockState(row: PortalLoginLockout): LoginLockState {
+  return {
+    failedAttempts: row.failedAttempts,
+    lockedUntil: row.lockedUntil ? row.lockedUntil.toISOString() : null,
+    lockType: row.lockType ?? undefined,
+    reason: row.reason,
+    updatedAt: row.updatedAt.toISOString()
   };
-  await mkdir(path.dirname(loginHistoryPath), { recursive: true });
-  await writeFile(loginHistoryPath, JSON.stringify(payload, null, 2), "utf8");
-  return payload;
+}
+
+function clearedLockState() {
+  return {
+    failedAttempts: 0,
+    lockedUntil: null as Date | null,
+    lockType: null as PortalLoginLockType | null,
+    reason: null as string | null,
+    updatedAt: new Date()
+  };
+}
+
+async function pruneOldHistory() {
+  const count = await prisma.portalLoginHistory.count();
+  if (count <= MAX_ENTRIES) return;
+  const toDelete = count - MAX_ENTRIES;
+  const oldest = await prisma.portalLoginHistory.findMany({
+    orderBy: { createdAt: "asc" },
+    take: toDelete,
+    select: { id: true }
+  });
+  if (oldest.length === 0) return;
+  await prisma.portalLoginHistory.deleteMany({ where: { id: { in: oldest.map((o) => o.id) } } });
 }
 
 export async function appendLoginHistory(input: {
@@ -77,111 +96,104 @@ export async function appendLoginHistory(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
-  const store = await readStore();
-  const entry: LoginHistoryEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    eventType: input.eventType,
-    userId: input.userId?.trim() || "",
-    userName: input.userName?.trim() || "",
-    userEmail: input.userEmail.trim().toLowerCase(),
-    userRole: input.userRole?.trim() || "",
-    ipAddress: input.ipAddress?.trim() || "",
-    userAgent: input.userAgent?.trim() || "",
-    deviceLabel: inferDeviceLabel(input.userAgent || ""),
-    createdAt: new Date().toISOString()
-  };
-
-  const entries = [entry, ...store.entries].slice(0, 500);
-  await saveStore(entries, store.lockouts);
-  return entry;
+  const ua = input.userAgent?.trim() || "";
+  const row = await prisma.portalLoginHistory.create({
+    data: {
+      eventType: input.eventType as PortalLoginHistoryEventType,
+      userId: input.userId?.trim() || "",
+      userName: input.userName?.trim() || "",
+      userEmail: input.userEmail.trim().toLowerCase(),
+      userRole: input.userRole?.trim() || "",
+      ipAddress: input.ipAddress?.trim() || "",
+      userAgent: ua,
+      deviceLabel: inferDeviceLabel(ua)
+    }
+  });
+  await pruneOldHistory();
+  return rowToEntry(row);
 }
 
 export async function listLoginHistory(filters: { search?: string; userId?: string; limit?: number } = {}) {
-  const store = await readStore();
   const search = filters.search?.trim().toLowerCase() || "";
+  const limit = Math.min(filters.limit || 100, 500);
 
-  return store.entries
-    .filter((entry) => (filters.userId ? entry.userId === filters.userId : true))
-    .filter((entry) => {
-      if (!search) return true;
-      return (
-        entry.userName.toLowerCase().includes(search) ||
-        entry.userEmail.toLowerCase().includes(search) ||
-        entry.userRole.toLowerCase().includes(search) ||
-        entry.eventType.toLowerCase().includes(search) ||
-        entry.ipAddress.toLowerCase().includes(search) ||
-        entry.deviceLabel.toLowerCase().includes(search)
-      );
-    })
-    .slice(0, filters.limit || 100);
+  const take = search ? MAX_ENTRIES : limit;
+
+  const rows = await prisma.portalLoginHistory.findMany({
+    where: filters.userId ? { userId: filters.userId } : undefined,
+    orderBy: { createdAt: "desc" },
+    take
+  });
+
+  const mapped = rows.map(rowToEntry).filter((entry) => {
+    if (!search) return true;
+    return (
+      entry.userName.toLowerCase().includes(search) ||
+      entry.userEmail.toLowerCase().includes(search) ||
+      entry.userRole.toLowerCase().includes(search) ||
+      entry.eventType.toLowerCase().includes(search) ||
+      entry.ipAddress.toLowerCase().includes(search) ||
+      entry.deviceLabel.toLowerCase().includes(search)
+    );
+  });
+
+  return mapped.slice(0, limit);
 }
 
 export async function clearFailedLoginAttempts(filters: { userId?: string; userEmail?: string }) {
-  const store = await readStore();
   const targetEmail = filters.userEmail?.trim().toLowerCase() || "";
+  const or: Array<{ userId: string } | { userEmail: string }> = [];
+  if (filters.userId) or.push({ userId: filters.userId });
+  if (targetEmail) or.push({ userEmail: targetEmail });
+
   let removedCount = 0;
-
-  const entries = store.entries.filter((entry) => {
-    const matchesUserId = filters.userId ? entry.userId === filters.userId : false;
-    const matchesUserEmail = targetEmail ? entry.userEmail === targetEmail : false;
-    const shouldClear = entry.eventType === "LOGIN_FAILED" && (matchesUserId || matchesUserEmail);
-
-    if (shouldClear) {
-      removedCount += 1;
-      return false;
-    }
-
-    return true;
-  });
-
-  const nextLockouts = { ...store.lockouts };
-  if (targetEmail && nextLockouts[targetEmail]) {
-    nextLockouts[targetEmail] = {
-      failedAttempts: 0,
-      lockedUntil: null,
-      lockType: undefined,
-      reason: null,
-      updatedAt: new Date().toISOString()
-    };
+  if (or.length > 0) {
+    const deleted = await prisma.portalLoginHistory.deleteMany({
+      where: {
+        eventType: PortalLoginHistoryEventType.LOGIN_FAILED,
+        OR: or
+      }
+    });
+    removedCount = deleted.count;
   }
 
-  if (removedCount > 0 || (targetEmail && store.lockouts[targetEmail])) {
-    await saveStore(entries, nextLockouts);
+  if (targetEmail) {
+    await prisma.portalLoginLockout.upsert({
+      where: { userEmail: targetEmail },
+      create: {
+        userEmail: targetEmail,
+        ...clearedLockState()
+      },
+      update: clearedLockState()
+    });
   }
 
   return { removedCount };
 }
 
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCK_WINDOW_MS = 1000 * 60 * 30;
-
 export async function getLoginLockouts() {
-  const store = await readStore();
-  return store.lockouts;
+  const rows = await prisma.portalLoginLockout.findMany();
+  const out: Record<string, LoginLockState> = {};
+  for (const row of rows) {
+    out[row.userEmail] = rowToLockState(row);
+  }
+  return out;
 }
 
 export async function getLoginLockState(userEmail: string) {
-  const store = await readStore();
   const email = userEmail.trim().toLowerCase();
-  const state = store.lockouts[email];
-  if (!state) return null;
+  const row = await prisma.portalLoginLockout.findUnique({ where: { userEmail: email } });
+  if (!row) return null;
 
-  if (state.lockedUntil && new Date(state.lockedUntil).getTime() <= Date.now()) {
-    const nextLockouts = {
-      ...store.lockouts,
-      [email]: {
-        failedAttempts: 0,
-        lockedUntil: null,
-        lockType: undefined,
-        reason: null,
-        updatedAt: new Date().toISOString()
-      }
-    };
-    await saveStore(store.entries, nextLockouts);
-    return nextLockouts[email];
+  if (row.lockedUntil && row.lockedUntil.getTime() <= Date.now()) {
+    const updated = await prisma.portalLoginLockout.update({
+      where: { userEmail: email },
+      data: clearedLockState()
+    });
+    return rowToLockState(updated);
   }
 
-  return state;
+  return rowToLockState(row);
 }
 
 export async function registerFailedLoginAttempt(input: {
@@ -192,44 +204,53 @@ export async function registerFailedLoginAttempt(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
-  const store = await readStore();
+  const ua = input.userAgent?.trim() || "";
   const email = input.userEmail.trim().toLowerCase();
-  const entry: LoginHistoryEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    eventType: "LOGIN_FAILED",
-    userId: input.userId?.trim() || "",
-    userName: input.userName?.trim() || "",
-    userEmail: email,
-    userRole: input.userRole?.trim() || "",
-    ipAddress: input.ipAddress?.trim() || "",
-    userAgent: input.userAgent?.trim() || "",
-    deviceLabel: inferDeviceLabel(input.userAgent || ""),
-    createdAt: new Date().toISOString()
-  };
 
-  const previous = store.lockouts[email] || {
-    failedAttempts: 0,
-    lockedUntil: null,
-    lockType: undefined,
-    reason: null,
-    updatedAt: new Date().toISOString()
-  };
-  const failedAttempts = previous.failedAttempts + 1;
-  const lockedUntil = failedAttempts >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCK_WINDOW_MS).toISOString() : null;
-  const lockType: LoginLockState["lockType"] = lockedUntil ? "AUTO" : undefined;
-  const nextLockouts = {
-    ...store.lockouts,
-    [email]: {
-      failedAttempts,
-      lockedUntil,
-      lockType,
-      reason: lockedUntil ? "Repeated failed login attempts" : null,
-      updatedAt: new Date().toISOString()
-    }
-  };
-  const entries = [entry, ...store.entries].slice(0, 500);
-  await saveStore(entries, nextLockouts);
-  return { entry, lockState: nextLockouts[email] };
+  const entryRow = await prisma.$transaction(async (tx) => {
+    const row = await tx.portalLoginHistory.create({
+      data: {
+        eventType: PortalLoginHistoryEventType.LOGIN_FAILED,
+        userId: input.userId?.trim() || "",
+        userName: input.userName?.trim() || "",
+        userEmail: email,
+        userRole: input.userRole?.trim() || "",
+        ipAddress: input.ipAddress?.trim() || "",
+        userAgent: ua,
+        deviceLabel: inferDeviceLabel(ua)
+      }
+    });
+
+    const previous = await tx.portalLoginLockout.findUnique({ where: { userEmail: email } });
+    const failedAttempts = (previous?.failedAttempts ?? 0) + 1;
+    const lockedUntil =
+      failedAttempts >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCK_WINDOW_MS) : null;
+    const lockType: PortalLoginLockType | null = lockedUntil ? PortalLoginLockType.AUTO : null;
+
+    await tx.portalLoginLockout.upsert({
+      where: { userEmail: email },
+      create: {
+        userEmail: email,
+        failedAttempts,
+        lockedUntil,
+        lockType,
+        reason: lockedUntil ? "Repeated failed login attempts" : null
+      },
+      update: {
+        failedAttempts,
+        lockedUntil,
+        lockType,
+        reason: lockedUntil ? "Repeated failed login attempts" : null
+      }
+    });
+
+    return row;
+  });
+
+  await pruneOldHistory();
+
+  const lockRow = await prisma.portalLoginLockout.findUniqueOrThrow({ where: { userEmail: email } });
+  return { entry: rowToEntry(entryRow), lockState: rowToLockState(lockRow) };
 }
 
 export async function registerSuccessfulLogin(input: {
@@ -240,71 +261,82 @@ export async function registerSuccessfulLogin(input: {
   ipAddress?: string | null;
   userAgent?: string | null;
 }) {
-  const store = await readStore();
+  const ua = input.userAgent?.trim() || "";
   const email = input.userEmail.trim().toLowerCase();
-  const entry: LoginHistoryEntry = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-    eventType: "LOGIN_SUCCESS",
-    userId: input.userId,
-    userName: input.userName,
-    userEmail: email,
-    userRole: input.userRole,
-    ipAddress: input.ipAddress?.trim() || "",
-    userAgent: input.userAgent?.trim() || "",
-    deviceLabel: inferDeviceLabel(input.userAgent || ""),
-    createdAt: new Date().toISOString()
-  };
 
-  const entries = [entry, ...store.entries].slice(0, 500);
-  const nextLockouts = {
-    ...store.lockouts,
-    [email]: {
-      failedAttempts: 0,
-      lockedUntil: null,
-      lockType: undefined,
-      reason: null,
-      updatedAt: new Date().toISOString()
-    }
-  };
-  await saveStore(entries, nextLockouts);
-  return entry;
+  const row = await prisma.$transaction(async (tx) => {
+    const created = await tx.portalLoginHistory.create({
+      data: {
+        eventType: PortalLoginHistoryEventType.LOGIN_SUCCESS,
+        userId: input.userId,
+        userName: input.userName,
+        userEmail: email,
+        userRole: input.userRole,
+        ipAddress: input.ipAddress?.trim() || "",
+        userAgent: ua,
+        deviceLabel: inferDeviceLabel(ua)
+      }
+    });
+
+    await tx.portalLoginLockout.upsert({
+      where: { userEmail: email },
+      create: {
+        userEmail: email,
+        failedAttempts: 0,
+        lockedUntil: null,
+        lockType: null,
+        reason: null
+      },
+      update: {
+        failedAttempts: 0,
+        lockedUntil: null,
+        lockType: null,
+        reason: null
+      }
+    });
+
+    return created;
+  });
+
+  await pruneOldHistory();
+  return rowToEntry(row);
 }
 
 export async function unlockLoginAccount(filters: { userEmail: string }) {
-  const store = await readStore();
   const email = filters.userEmail.trim().toLowerCase();
-  const current = store.lockouts[email];
-  if (!current) {
+  const existing = await prisma.portalLoginLockout.findUnique({ where: { userEmail: email } });
+  if (!existing) {
     return { unlocked: false };
   }
 
-  const nextLockouts = {
-    ...store.lockouts,
-    [email]: {
-      failedAttempts: 0,
-      lockedUntil: null,
-      lockType: undefined,
-      reason: null,
-      updatedAt: new Date().toISOString()
-    }
-  };
-  await saveStore(store.entries, nextLockouts);
+  await prisma.portalLoginLockout.update({
+    where: { userEmail: email },
+    data: clearedLockState()
+  });
   return { unlocked: true };
 }
 
 export async function lockLoginAccount(filters: { userEmail: string; reason?: string | null }) {
-  const store = await readStore();
   const email = filters.userEmail.trim().toLowerCase();
-  const nextLockouts = {
-    ...store.lockouts,
-    [email]: {
-      failedAttempts: Math.max(store.lockouts[email]?.failedAttempts || 0, MAX_FAILED_ATTEMPTS),
-      lockedUntil: new Date(Date.now() + LOCK_WINDOW_MS).toISOString(),
-      lockType: "MANUAL" as const,
-      reason: filters.reason?.trim() || "Locked by administrator",
-      updatedAt: new Date().toISOString()
+  const prev = await prisma.portalLoginLockout.findUnique({ where: { userEmail: email } });
+  const failedFloor = Math.max(prev?.failedAttempts ?? 0, MAX_FAILED_ATTEMPTS);
+
+  const updated = await prisma.portalLoginLockout.upsert({
+    where: { userEmail: email },
+    create: {
+      userEmail: email,
+      failedAttempts: failedFloor,
+      lockedUntil: new Date(Date.now() + LOCK_WINDOW_MS),
+      lockType: PortalLoginLockType.MANUAL,
+      reason: filters.reason?.trim() || "Locked by administrator"
+    },
+    update: {
+      failedAttempts: failedFloor,
+      lockedUntil: new Date(Date.now() + LOCK_WINDOW_MS),
+      lockType: PortalLoginLockType.MANUAL,
+      reason: filters.reason?.trim() || "Locked by administrator"
     }
-  };
-  await saveStore(store.entries, nextLockouts);
-  return { locked: true, lockState: nextLockouts[email] };
+  });
+
+  return { locked: true, lockState: rowToLockState(updated) };
 }

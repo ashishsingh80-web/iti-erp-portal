@@ -1206,6 +1206,46 @@ model AuditLog {
   @@index([module, createdAt])
 }
 
+enum PortalLoginHistoryEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+}
+
+enum PortalLoginLockType {
+  AUTO
+  MANUAL
+}
+
+model PortalLoginHistory {
+  id          String                    @id @default(cuid())
+  eventType   PortalLoginHistoryEventType
+  userId      String                    @default("")
+  userName    String                    @default("")
+  userEmail   String                    @default("")
+  userRole    String                    @default("")
+  ipAddress   String                    @default("")
+  userAgent   String                    @default("")
+  deviceLabel String                    @default("")
+  createdAt   DateTime                  @default(now())
+
+  @@index([userEmail])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("portal_login_history")
+}
+
+model PortalLoginLockout {
+  userEmail      String               @id
+  failedAttempts Int                  @default(0)
+  lockedUntil    DateTime?
+  lockType       PortalLoginLockType?
+  reason         String?
+  updatedAt      DateTime             @updatedAt
+
+  @@map("portal_login_lockouts")
+}
+
 model CommunicationTemplate {
   id              String               @id @default(cuid())
   title           String

@@ -48,8 +48,25 @@ export function ParentLoginForm() {
 
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
-      <Input label="Student Code" required autoComplete="username" helperText="Enter your child's student code." onChange={(event) => setStudentCode(event.target.value.toUpperCase())} value={studentCode} />
-      <Input label="Parent Mobile" required helperText="Use the mobile number stored in the admission record." onChange={(event) => setParentMobile(event.target.value)} value={parentMobile} />
+      <Input
+        id="parent-login-student-code"
+        name="studentCode"
+        label="Student Code"
+        required
+        autoComplete="username"
+        helperText="Enter your child's student code."
+        onChange={(event) => setStudentCode(event.target.value.toUpperCase())}
+        value={studentCode}
+      />
+      <Input
+        id="parent-login-mobile"
+        name="parentMobile"
+        label="Parent Mobile"
+        required
+        helperText="Use the mobile number stored in the admission record."
+        onChange={(event) => setParentMobile(event.target.value)}
+        value={parentMobile}
+      />
 
       {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
 
