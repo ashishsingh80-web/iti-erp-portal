@@ -24,14 +24,12 @@ export default async function HomePage({
 }) {
   await requireUser();
   const query = await searchParams;
-  const lang = await readAppLanguage();
   const selectedSession = typeof query.session === "string" ? query.session : null;
-  let dashboardCards: Awaited<ReturnType<typeof getDashboardMetrics>> = [];
-  try {
-    dashboardCards = await getDashboardMetrics(selectedSession);
-  } catch {
-    dashboardCards = [];
-  }
+  const [lang, metricsResult] = await Promise.all([
+    readAppLanguage(),
+    getDashboardMetrics(selectedSession).catch(() => [] as Awaited<ReturnType<typeof getDashboardMetrics>>)
+  ]);
+  let dashboardCards: Awaited<ReturnType<typeof getDashboardMetrics>> = metricsResult;
   if (dashboardCards.length < 2) {
     dashboardCards = [
       { label: "Active Sessions", value: "N/A", helper: "Dashboard metrics unavailable right now" },

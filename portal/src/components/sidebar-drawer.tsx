@@ -51,7 +51,7 @@ export function SidebarDrawer({
             onClick={() => setOpen(false)}
             type="button"
           />
-          <div className="relative flex h-[100dvh] max-h-[100dvh] w-[min(92vw,360px)] flex-col border-r border-white/10 bg-slate-950 shadow-2xl">
+          <div className="relative flex h-[100dvh] max-h-[100dvh] w-[min(94vw,380px)] flex-col border-r border-white/10 bg-slate-950 shadow-2xl">
             <div className="flex shrink-0 justify-end p-3 pb-2 pt-[max(0.75rem,env(safe-area-inset-top,0px))]">
               <button
                 className="rounded-xl border border-white/30 bg-slate-900/90 px-3 py-2 text-xs font-semibold text-white"
@@ -61,8 +61,13 @@ export function SidebarDrawer({
                 Close
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
-              <Sidebar badges={badges} lang={lang} user={user} />
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+              <Sidebar
+                badges={badges}
+                className="h-auto max-h-none overflow-visible rounded-none border-0 shadow-none md:h-auto md:max-h-none"
+                lang={lang}
+                user={user}
+              />
             </div>
           </div>
         </div>

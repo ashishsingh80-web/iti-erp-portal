@@ -345,6 +345,141 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
   return metrics;
 }
 
+/**
+ * Sidebar queue badges only (ALL_ACTIVE sessions). Skips eligibility + today's cash queries so
+ * layout renders faster than full `getDashboardMetrics` on every navigation.
+ */
+async function fetchSidebarQueueBadges(): Promise<DashboardMetric[]> {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const sessionConfig = await readSessionConfig();
+  const activeSessions = [sessionConfig.activeOneYearSession, sessionConfig.activeTwoYearSession];
+  const dashboardSessions = Array.from(new Set(activeSessions.flatMap((item) => buildSessionVariants(item))));
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const todayDateOnly = new Date();
+  todayDateOnly.setHours(0, 0, 0, 0);
+
+  const [
+    totalStudents,
+    pendingAdmissions,
+    docsPending,
+    feeDueCases,
+    todayEnquiries,
+    followUpEnquiries,
+    scholarshipQueries,
+    prnPending,
+    scvtPending,
+    sessionStudentScope
+  ] = await Promise.all([
+    prisma.student.count({
+      where: {
+        session: { in: dashboardSessions }
+      }
+    }),
+    prisma.student.count({
+      where: {
+        session: { in: dashboardSessions },
+        status: { in: ["DRAFT", "IN_PROGRESS", "UNDER_REVIEW"] }
+      }
+    }),
+    prisma.student.count({
+      where: {
+        session: { in: dashboardSessions },
+        documentsStatus: { in: [VerificationStatus.PENDING, VerificationStatus.INCOMPLETE] }
+      }
+    }),
+    prisma.feeProfile.count({
+      where: {
+        dueAmount: { gt: 0 },
+        student: { session: { in: dashboardSessions } }
+      }
+    }),
+    prisma.enquiry.findMany({
+      where: {
+        enquiryDate: { gte: startOfToday, lte: endOfToday }
+      },
+      select: { instituteCode: true, tradeId: true }
+    }),
+    prisma.enquiry.findMany({
+      where: {
+        nextFollowUpDate: { lte: todayDateOnly },
+        status: {
+          in: [
+            EnquiryStatus.NEW,
+            EnquiryStatus.FOLLOW_UP,
+            EnquiryStatus.VISIT_SCHEDULED,
+            EnquiryStatus.COUNSELLED,
+            EnquiryStatus.INTERESTED,
+            EnquiryStatus.DOCUMENTS_PENDING
+          ]
+        }
+      },
+      select: { instituteCode: true, tradeId: true }
+    }),
+    prisma.scholarshipRecord.count({
+      where: {
+        student: { session: { in: dashboardSessions } },
+        status: ScholarshipStatus.QUERY_BY_DEPARTMENT
+      }
+    }),
+    prisma.student.count({
+      where: {
+        session: { in: dashboardSessions },
+        OR: [{ prnScvtRecord: { is: null } }, { prnScvtRecord: { is: { prnNumber: null } } }]
+      }
+    }),
+    prisma.student.count({
+      where: {
+        session: { in: dashboardSessions },
+        OR: [{ prnScvtRecord: { is: null } }, { prnScvtRecord: { is: { scvtRegistrationNumber: null } } }]
+      }
+    }),
+    prisma.student.findMany({
+      where: { session: { in: dashboardSessions } },
+      distinct: ["instituteId", "tradeId"],
+      select: {
+        tradeId: true,
+        institute: { select: { instituteCode: true } }
+      }
+    })
+  ]);
+
+  const scopedInstituteCodes = new Set(
+    sessionStudentScope
+      .map((row) => String(row.institute.instituteCode || "").trim().toUpperCase())
+      .filter(Boolean)
+  );
+  const scopedTradeIds = new Set(sessionStudentScope.map((row) => row.tradeId));
+  const isScopedEnquiry = (row: { instituteCode: string | null; tradeId: string | null }) =>
+    (row.tradeId && scopedTradeIds.has(row.tradeId)) ||
+    (row.instituteCode && scopedInstituteCodes.has(String(row.instituteCode).trim().toUpperCase()));
+  const newEnquiries = todayEnquiries.filter(isScopedEnquiry).length;
+  const followUpsDue = followUpEnquiries.filter(isScopedEnquiry).length;
+
+  const helper = "Queue depth for navigation";
+  return [
+    { label: "Total Students", value: String(totalStudents), helper },
+    { label: "Pending Admissions", value: String(pendingAdmissions), helper },
+    { label: "Docs Pending", value: String(docsPending), helper },
+    { label: "Fee Due Cases", value: String(feeDueCases), helper },
+    { label: "New Enquiries", value: String(newEnquiries), helper },
+    { label: "Follow-Ups Due", value: String(followUpsDue), helper },
+    { label: "Scholarship Queries", value: String(scholarshipQueries), helper },
+    { label: "PRN Pending", value: String(prnPending), helper },
+    { label: "SCVT Pending", value: String(scvtPending), helper }
+  ];
+}
+
+export const getSidebarQueueBadges = cache(async () => {
+  const dayKey = toLocalDayKey(new Date());
+  return unstable_cache(
+    async () => fetchSidebarQueueBadges(),
+    ["portal-sidebar-queue-badges", dayKey],
+    { revalidate: 120, tags: ["sidebar-badges", "dashboard-metrics"] }
+  )();
+});
+
 function requestSessionKey(selectedSession?: string | null): string {
   if (!selectedSession || selectedSession === "ALL_ACTIVE") return "ALL_ACTIVE";
   return selectedSession;

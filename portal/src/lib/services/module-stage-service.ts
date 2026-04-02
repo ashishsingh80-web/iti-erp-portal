@@ -26,7 +26,7 @@ export type StageBoardData = {
   rows: StageRow[];
 };
 
-const STAGE_BOARD_CACHE_TTL_MS = 20_000;
+const STAGE_BOARD_CACHE_TTL_MS = 45_000;
 const stageBoardsCache = new Map<
   string,
   {
@@ -82,7 +82,7 @@ export async function getDashboardStageBoards() {
   return unstable_cache(
     async () => loadDashboardStageBoards(),
     ["portal-stage-boards", dayKey],
-    { revalidate: 45, tags: ["stage-boards"] }
+    { revalidate: 90, tags: ["stage-boards"] }
   )();
 }
 

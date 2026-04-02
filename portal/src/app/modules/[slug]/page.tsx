@@ -1,53 +1,5 @@
 import { notFound } from "next/navigation";
-import { AccountsDesk } from "@/components/accounts/accounts-desk";
-import { AdmissionFormPreview } from "@/components/admissions/admission-form-preview";
-import { AdmissionsDesk } from "@/components/admissions/admissions-desk";
-import { AgentsDesk } from "@/components/agents/agents-desk";
-import { AttendanceDesk } from "@/components/attendance/attendance-desk";
-import { BackupDesk } from "@/components/backup/backup-desk";
-import { AuditLogPanel } from "@/components/audit/audit-log-panel";
-import { CertificatesDesk } from "@/components/certificates/certificates-desk";
-import { CommunicationDesk } from "@/components/communication/communication-desk";
-import { DocumentsDesk } from "@/components/documents/documents-desk";
-import { EnquiryDesk } from "@/components/enquiry/enquiry-desk";
-import { ExamStatusDesk } from "@/components/exams/exam-status-desk";
-import { AgentLedgerPanel } from "@/components/fees/agent-ledger-panel";
-import { AgentOutstandingPanel } from "@/components/fees/agent-outstanding-panel";
-import { FeeCollectionDesk } from "@/components/fees/fee-collection-desk";
-import { GrievanceDesk } from "@/components/grievance/grievance-desk";
-import { HrDesk } from "@/components/hr/hr-desk";
-import { IdCardsDesk } from "@/components/id-cards/id-cards-desk";
-import { InventoryDesk } from "@/components/inventory/inventory-desk";
-import { LibraryDesk } from "@/components/library/library-desk";
-import { ManagementDashboard } from "@/components/management/management-dashboard";
-import { OcrImportDesk } from "@/components/modules/ocr-import-desk";
-import { DashboardOperations } from "@/components/modules/dashboard-operations";
 import { StageBoard } from "@/components/modules/stage-board";
-import { PlacementDesk } from "@/components/placement/placement-desk";
-import { PrnDesk } from "@/components/prn/prn-desk";
-import { ReportsDashboard } from "@/components/reports/reports-dashboard";
-import { ScvtDesk } from "@/components/scvt/scvt-desk";
-import { ScholarshipDesk } from "@/components/scholarship/scholarship-desk";
-import { AddressMasterPanel } from "@/components/settings/address-master-panel";
-import { ClassificationMastersPanel } from "@/components/settings/classification-masters-panel";
-import { ExpandableSettingsSection } from "@/components/settings/expandable-settings-section";
-import { FinanceComplianceMastersPanel } from "@/components/settings/finance-compliance-masters-panel";
-import { InstituteBrandingPanel } from "@/components/settings/institute-branding-panel";
-import { MasterControlPanel } from "@/components/settings/master-control-panel";
-import { NumberingControlPanel } from "@/components/settings/numbering-control-panel";
-import { RecycleBinPanel } from "@/components/settings/recycle-bin-panel";
-import { SessionControlPanel } from "@/components/settings/session-control-panel";
-import { InstituteMasterPanel } from "@/components/settings/institute-master-panel";
-import { UndertakingTemplatePanel } from "@/components/settings/undertaking-template-panel";
-import { UserManagementPanel } from "@/components/settings/user-management-panel";
-import { TimetableDesk } from "@/components/timetable/timetable-desk";
-import { UndertakingDesk } from "@/components/undertaking/undertaking-desk";
-import { HistoricalUploadDesk } from "@/components/students/historical-upload-desk";
-import { AlumniDesk } from "@/components/students/alumni-desk";
-import { NoDuesDesk } from "@/components/students/no-dues-desk";
-import { PromotionDesk } from "@/components/students/promotion-desk";
-import { StudentArchiveDesk } from "@/components/students/student-archive-desk";
-import { StudentDirectoryPreview } from "@/components/students/student-directory-preview";
 import { canUserAccessModule } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
 import { t } from "@/lib/i18n";
@@ -62,6 +14,39 @@ import {
   getScholarshipStageBoard,
   getUndertakingStageBoard
 } from "@/lib/services/module-stage-service";
+import {
+  LazyAccountsDesk,
+  LazyAdmissionsDesk,
+  LazyAgentsDesk,
+  LazyAlumniDesk,
+  LazyAttendanceDesk,
+  LazyBackupDesk,
+  LazyCertificatesDesk,
+  LazyCommunicationDesk,
+  LazyDashboardOperations,
+  LazyDocumentsDesk,
+  LazyEnquiryDesk,
+  LazyExamStatusDesk,
+  LazyFeesModuleGroup,
+  LazyGrievanceDesk,
+  LazyHrDesk,
+  LazyIdCardsDesk,
+  LazyInventoryDesk,
+  LazyLibraryDesk,
+  LazyManagementDashboard,
+  LazyModuleSettingsContent,
+  LazyNoDuesDesk,
+  LazyPlacementDesk,
+  LazyPrnDesk,
+  LazyPromotionDesk,
+  LazyReportsDashboard,
+  LazyScholarshipDesk,
+  LazyScvtDesk,
+  LazyStudentArchiveDesk,
+  LazyStudentsModuleGroup,
+  LazyTimetableDesk,
+  LazyUndertakingDesk
+} from "./lazy-module-desks";
 
 export default async function ModulePage({
   params,
@@ -88,13 +73,13 @@ export default async function ModulePage({
           ? await getScholarshipStageBoard()
           : slug === "exam-status"
             ? await getExamStatusStageBoard()
-          : slug === "scvt"
-            ? await getScvtStageBoard()
-            : slug === "prn"
-              ? await getPrnStageBoard()
-              : slug === "undertaking"
-                ? await getUndertakingStageBoard()
-                : null;
+            : slug === "scvt"
+              ? await getScvtStageBoard()
+              : slug === "prn"
+                ? await getPrnStageBoard()
+                : slug === "undertaking"
+                  ? await getUndertakingStageBoard()
+                  : null;
 
   return (
     <div className="space-y-6">
@@ -114,9 +99,9 @@ export default async function ModulePage({
         </section>
       ) : null}
 
-      {slug === "dashboard" ? <DashboardOperations /> : null}
+      {slug === "dashboard" ? <LazyDashboardOperations /> : null}
       {slug === "admissions" ? (
-        <AdmissionsDesk
+        <LazyAdmissionsDesk
           filters={{
             search: typeof query.search === "string" ? query.search : "",
             instituteCode: typeof query.instituteCode === "string" ? query.instituteCode : "",
@@ -131,17 +116,17 @@ export default async function ModulePage({
           }}
         />
       ) : null}
-      {slug === "enquiry" ? <EnquiryDesk /> : null}
-      {slug === "documents" ? <DocumentsDesk /> : null}
-      {slug === "exam-status" ? <ExamStatusDesk search={typeof query.search === "string" ? query.search : ""} /> : null}
-      {slug === "attendance" ? <AttendanceDesk /> : null}
-      {slug === "undertaking" ? <UndertakingDesk /> : null}
-      {slug === "inventory" ? <InventoryDesk /> : null}
-      {slug === "library" ? <LibraryDesk /> : null}
-      {slug === "timetable" ? <TimetableDesk /> : null}
-      {slug === "certificates" ? <CertificatesDesk /> : null}
+      {slug === "enquiry" ? <LazyEnquiryDesk /> : null}
+      {slug === "documents" ? <LazyDocumentsDesk /> : null}
+      {slug === "exam-status" ? <LazyExamStatusDesk search={typeof query.search === "string" ? query.search : ""} /> : null}
+      {slug === "attendance" ? <LazyAttendanceDesk /> : null}
+      {slug === "undertaking" ? <LazyUndertakingDesk /> : null}
+      {slug === "inventory" ? <LazyInventoryDesk /> : null}
+      {slug === "library" ? <LazyLibraryDesk /> : null}
+      {slug === "timetable" ? <LazyTimetableDesk /> : null}
+      {slug === "certificates" ? <LazyCertificatesDesk /> : null}
       {slug === "id-cards" ? (
-        <IdCardsDesk
+        <LazyIdCardsDesk
           search={typeof query.search === "string" ? query.search : ""}
           registerSearch={typeof query.registerSearch === "string" ? query.registerSearch : ""}
           registerType={typeof query.registerType === "string" ? query.registerType : ""}
@@ -150,32 +135,23 @@ export default async function ModulePage({
           registerReplacementStatus={typeof query.registerReplacementStatus === "string" ? query.registerReplacementStatus : ""}
         />
       ) : null}
-      {slug === "students" ? (
-        <>
-          <HistoricalUploadDesk />
-          <StudentDirectoryPreview />
-        </>
-      ) : null}
-      {slug === "promote" ? <PromotionDesk /> : null}
-      {slug === "alumni" ? <AlumniDesk /> : null}
-      {slug === "student-archive" ? <StudentArchiveDesk /> : null}
-      {slug === "no-dues" ? <NoDuesDesk /> : null}
+      {slug === "students" ? <LazyStudentsModuleGroup /> : null}
+      {slug === "promote" ? <LazyPromotionDesk /> : null}
+      {slug === "alumni" ? <LazyAlumniDesk /> : null}
+      {slug === "student-archive" ? <LazyStudentArchiveDesk /> : null}
+      {slug === "no-dues" ? <LazyNoDuesDesk /> : null}
       {slug === "fees" ? (
-        <>
-          <FeeCollectionDesk />
-          <AgentLedgerPanel
-            initialFilters={{
-              agentCode: typeof query.agentCode === "string" ? query.agentCode : "",
-              search: typeof query.search === "string" ? query.search : "",
-              session: typeof query.session === "string" ? query.session : "",
-              yearLabel: typeof query.yearLabel === "string" ? query.yearLabel : ""
-            }}
-          />
-          <AgentOutstandingPanel />
-        </>
+        <LazyFeesModuleGroup
+          ledgerFilters={{
+            agentCode: typeof query.agentCode === "string" ? query.agentCode : "",
+            search: typeof query.search === "string" ? query.search : "",
+            session: typeof query.session === "string" ? query.session : "",
+            yearLabel: typeof query.yearLabel === "string" ? query.yearLabel : ""
+          }}
+        />
       ) : null}
       {slug === "accounts" ? (
-        <AccountsDesk
+        <LazyAccountsDesk
           initialFilters={{
             entryType: typeof query.entryType === "string" ? query.entryType : "",
             month: typeof query.filterMonth === "string" ? query.filterMonth : "",
@@ -191,12 +167,12 @@ export default async function ModulePage({
           }}
         />
       ) : null}
-      {slug === "hr" ? <HrDesk /> : null}
-      {slug === "scholarship" ? <ScholarshipDesk /> : null}
-      {slug === "scvt" ? <ScvtDesk /> : null}
-      {slug === "prn" ? <PrnDesk /> : null}
+      {slug === "hr" ? <LazyHrDesk /> : null}
+      {slug === "scholarship" ? <LazyScholarshipDesk /> : null}
+      {slug === "scvt" ? <LazyScvtDesk /> : null}
+      {slug === "prn" ? <LazyPrnDesk /> : null}
       {slug === "reports" ? (
-        <ReportsDashboard
+        <LazyReportsDashboard
           filters={{
             report: typeof query.report === "string" ? query.report : "",
             search: typeof query.search === "string" ? query.search : "",
@@ -221,86 +197,19 @@ export default async function ModulePage({
         />
       ) : null}
       {slug === "management" ? (
-        <ManagementDashboard
+        <LazyManagementDashboard
           filters={{
             session: typeof query.session === "string" ? query.session : ""
           }}
         />
       ) : null}
-      {slug === "agents" ? <AgentsDesk /> : null}
-      {slug === "communication" ? <CommunicationDesk /> : null}
-      {slug === "grievance" ? <GrievanceDesk /> : null}
-      {slug === "placement" ? <PlacementDesk /> : null}
-      {slug === "backup" ? <BackupDesk /> : null}
+      {slug === "agents" ? <LazyAgentsDesk /> : null}
+      {slug === "communication" ? <LazyCommunicationDesk /> : null}
+      {slug === "grievance" ? <LazyGrievanceDesk /> : null}
+      {slug === "placement" ? <LazyPlacementDesk /> : null}
+      {slug === "backup" ? <LazyBackupDesk /> : null}
       {slug === "settings" && ["SUPER_ADMIN", "ADMIN"].includes(user.role) ? (
-        <div className="grid gap-6">
-          <ExpandableSettingsSection
-            badges={[
-              { label: "Master overview", tone: "success" },
-              { label: "Expand master map", tone: "neutral" }
-            ]}
-            defaultOpen
-            description="See the institute setup map, live masters, and remaining setup areas in one expandable control block."
-            eyebrow="Master Control"
-            title="Institute Setup Overview"
-          >
-            <MasterControlPanel />
-          </ExpandableSettingsSection>
-
-          <ExpandableSettingsSection
-            badges={[
-              { label: "Institute master live", tone: "success" },
-              { label: "Session master live", tone: "success" },
-              { label: "Unit / shift live", tone: "success" }
-            ]}
-            defaultOpen
-            description="Institute identity, affiliation-linked codes, trade master, academic session, and working academic structure in one expandable section."
-            eyebrow="Section 1"
-            title="Institute & Academic Setup"
-          >
-            <div className="grid gap-6">
-              <InstituteMasterPanel />
-              <InstituteBrandingPanel />
-              <SessionControlPanel />
-              <ClassificationMastersPanel />
-              <FinanceComplianceMastersPanel />
-            </div>
-          </ExpandableSettingsSection>
-
-          <ExpandableSettingsSection
-            badges={[
-              { label: "Address master live", tone: "success" },
-              { label: "Numbering live", tone: "success" },
-              { label: "Template live", tone: "success" }
-            ]}
-            description="Location masters, numbering control, and print-template setup that support admissions, fees, and document generation."
-            eyebrow="Section 2"
-            title="Geography, Finance & Templates"
-          >
-            <div className="grid gap-6">
-              <AddressMasterPanel />
-              <NumberingControlPanel />
-              <UndertakingTemplatePanel />
-            </div>
-          </ExpandableSettingsSection>
-
-          <ExpandableSettingsSection
-            badges={[
-              { label: "Users live", tone: "success" },
-              { label: "Recycle bin live", tone: "success" },
-              { label: "Audit live", tone: "success" }
-            ]}
-            description="User access, recovery, and audit controls for safe institute operations."
-            eyebrow="Section 3"
-            title="Security & Administration"
-          >
-            <div className="grid gap-6">
-              <UserManagementPanel />
-              <RecycleBinPanel />
-              <AuditLogPanel />
-            </div>
-          </ExpandableSettingsSection>
-        </div>
+        <LazyModuleSettingsContent user={user} />
       ) : null}
       {liveBoard ? <StageBoard board={liveBoard} /> : null}
     </div>

@@ -7,7 +7,7 @@ import { SidebarDrawer } from "@/components/sidebar-drawer";
 import { ToastHost } from "@/components/ui/toast-host";
 import { getCurrentUser } from "@/lib/auth";
 import { readAppLanguage } from "@/lib/i18n-server";
-import { getDashboardMetrics } from "@/lib/services/dashboard-service";
+import { getSidebarQueueBadges } from "@/lib/services/dashboard-service";
 import { readSessionConfig } from "@/lib/session-config";
 import "./globals.css";
 import { CsrfFetchWrapper } from "@/components/security/csrf-fetch-wrapper";
@@ -50,7 +50,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const [sessionConfig, lang, sidebarBadgeMetrics] = await Promise.all([
     user ? readSessionConfig() : Promise.resolve(null),
     readAppLanguage(),
-    user ? getDashboardMetrics() : Promise.resolve([])
+    user ? getSidebarQueueBadges() : Promise.resolve([])
   ]);
   const sidebarBadges = Object.fromEntries(
     sidebarBadgeMetrics.map((item) => [item.label, item.value])
@@ -64,8 +64,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         {user ? (
           <>
             <div className="mx-auto grid min-h-screen max-w-[1700px] items-start gap-6 px-4 py-6 print:block print:max-w-none print:px-0 print:py-0 md:grid-cols-[320px_minmax(0,1fr)] md:px-6">
-              <div className="hidden min-h-0 md:block md:self-start">
-                <Sidebar badges={sidebarBadges} lang={lang} user={user} />
+              <div className="hidden min-h-0 md:-my-6 md:block md:self-start">
+                <Sidebar badges={sidebarBadges} className="md:top-0 md:h-[100dvh] md:max-h-[100dvh]" lang={lang} user={user} />
               </div>
               <main className="space-y-6 overflow-visible print:space-y-0">
                 <div className="md:hidden">

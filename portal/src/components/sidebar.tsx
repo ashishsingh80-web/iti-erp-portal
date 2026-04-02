@@ -24,11 +24,13 @@ const roleDefaultPins: Record<AuthUser["role"], string[]> = {
 export function Sidebar({
   user,
   lang,
-  badges
+  badges,
+  className
 }: {
   user: AuthUser;
   lang: AppLanguage;
   badges: Record<string, string>;
+  className?: string;
 }) {
   const pathname = usePathname();
   const [search, setSearch] = useState("");
@@ -187,7 +189,9 @@ export function Sidebar({
   }
 
   return (
-    <aside className="relative z-20 block min-h-0 w-full shrink-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[2rem] border border-white/60 bg-slate-950 px-5 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] text-white shadow-2xl print:hidden md:sticky md:top-6 md:max-h-[calc(100dvh-3rem)] md:w-[320px] md:max-w-[320px] md:self-start">
+    <aside
+      className={`relative z-20 block min-h-0 w-full shrink-0 overflow-x-hidden overflow-y-auto overscroll-contain rounded-[2rem] border border-white/60 bg-slate-950 px-5 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] text-white shadow-2xl print:hidden md:sticky md:top-6 md:h-[calc(100vh-3rem)] md:max-h-[calc(100vh-3rem)] md:w-[320px] md:max-w-[320px] md:self-start ${className || ""}`}
+    >
       <div className="rounded-[1.75rem] bg-white/5 p-4">
         <div className="flex flex-col items-center text-center">
           <div className="shrink-0 leading-none">

@@ -10,13 +10,21 @@ function hashPassword(password) {
 }
 
 async function main() {
+  // BHB / school ERP demo logins (dev only — change passwords in production).
+  // Includes legacy @itierp.local aliases so older DBs work after re-seed; BHB emails are preferred for new setups.
   const users = [
-    { email: "admin@itierp.local", name: "Portal Admin", role: "ADMIN", password: "Admin@123" },
-    { email: "admission@itierp.local", name: "Admission Desk", role: "ADMISSION_STAFF", password: "Admission@123" },
-    { email: "documents@itierp.local", name: "Document Verifier", role: "DOCUMENT_VERIFIER", password: "Documents@123" },
-    { email: "finance@itierp.local", name: "Finance Desk", role: "FINANCE_DESK", password: "Finance@123" },
-    { email: "scholarship@itierp.local", name: "Scholarship Desk", role: "SCHOLARSHIP_DESK", password: "Scholarship@123" },
-    { email: "prn@itierp.local", name: "PRN SCVT Desk", role: "PRN_SCVT_DESK", password: "PrnScvt@123" }
+    { email: "admin@bhb.local", name: "BHB School — Admin", role: "ADMIN", password: "Admin@123" },
+    { email: "admin@itierp.local", name: "Legacy ITI — Admin", role: "ADMIN", password: "Admin@123" },
+    { email: "admission@bhb.local", name: "BHB School — Admission", role: "ADMISSION_STAFF", password: "Admission@123" },
+    { email: "admission@itierp.local", name: "Legacy ITI — Admission", role: "ADMISSION_STAFF", password: "Admission@123" },
+    { email: "documents@bhb.local", name: "BHB School — Documents", role: "DOCUMENT_VERIFIER", password: "Documents@123" },
+    { email: "documents@itierp.local", name: "Legacy ITI — Documents", role: "DOCUMENT_VERIFIER", password: "Documents@123" },
+    { email: "finance@bhb.local", name: "BHB School — Finance", role: "FINANCE_DESK", password: "Finance@123" },
+    { email: "finance@itierp.local", name: "Legacy ITI — Finance", role: "FINANCE_DESK", password: "Finance@123" },
+    { email: "scholarship@bhb.local", name: "BHB School — Scholarship", role: "SCHOLARSHIP_DESK", password: "Scholarship@123" },
+    { email: "scholarship@itierp.local", name: "Legacy ITI — Scholarship", role: "SCHOLARSHIP_DESK", password: "Scholarship@123" },
+    { email: "prn@bhb.local", name: "BHB School — PRN / SCVT", role: "PRN_SCVT_DESK", password: "PrnScvt@123" },
+    { email: "prn@itierp.local", name: "Legacy ITI — PRN / SCVT", role: "PRN_SCVT_DESK", password: "PrnScvt@123" }
   ];
 
   for (const user of users) {

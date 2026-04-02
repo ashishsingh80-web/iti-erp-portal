@@ -44,14 +44,16 @@ export function UserMenu({
   );
 
   function switchSession(nextSession: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams();
     if (nextSession === "ALL_ACTIVE") {
       params.delete("session");
     } else {
       params.set("session", nextSession);
     }
-    router.push(`/?${params.toString()}`);
+    const nextHref = params.toString() ? `/?${params.toString()}` : "/";
+    router.replace(nextHref as never);
     router.refresh();
+    setOpen(false);
   }
 
   useEffect(() => {
@@ -170,7 +172,7 @@ export function UserMenu({
                   </a>
                   <a
                     className={`rounded-2xl px-4 py-3 text-sm font-semibold ${pathname === "/" ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-slate-700"}`}
-                    href="/"
+                    href={selectedDashboardSession === "ALL_ACTIVE" ? "/" : `/?session=${encodeURIComponent(selectedDashboardSession)}`}
                   >
                     {t(lang, "Open Dashboard")}
                   </a>
