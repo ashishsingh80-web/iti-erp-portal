@@ -1,7 +1,7 @@
 import { StudentArchiveCategory, StudentLifecycleStage, StudentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { tradeUnitCatalog } from "@/lib/constants";
-import { buildTradeCycleSessionVariants } from "@/lib/services/admission-service";
+import { countStudentsOnUnitForAdmission } from "@/lib/services/admission-service";
 import { createAuditLog } from "@/lib/services/audit-service";
 
 export type AdmissionLifecycleAction = "CANCELED" | "DROPPED" | "TRANSFERRED";
@@ -92,17 +92,14 @@ export async function assignAdmissionUnit(studentId: string, unitNumber: number,
     throw new Error(`Valid unit must be between 1 and ${tradeConfig.unitCount}`);
   }
 
-  const sessionVariants = buildTradeCycleSessionVariants(student.session, tradeConfig.durationYears);
-  const existingCount = await prisma.student.count({
-    where: {
-      deletedAt: null,
-      instituteId: student.instituteId,
-      tradeId: student.tradeId,
-      unitNumber,
-      ...(sessionVariants.length ? { session: { in: sessionVariants } } : {}),
-      ...(tradeConfig.durationYears <= 1 ? { yearLabel: student.yearLabel } : {}),
-      NOT: { id: student.id }
-    }
+  const existingCount = await countStudentsOnUnitForAdmission({
+    instituteId: student.instituteId,
+    tradeId: student.tradeId,
+    tradeKey: tradeValue,
+    unitNumber,
+    session: student.session,
+    yearLabel: student.yearLabel,
+    excludeStudentId: student.id
   });
 
   if (existingCount >= tradeConfig.seatsPerUnit) {

@@ -3,7 +3,11 @@ import { readClassificationMasters } from "@/lib/classification-masters";
 import { tradeUnitCatalog } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { buildSessionVariants, normalizeSessionLabel, readSessionConfig } from "@/lib/session-config";
-import { buildTradeCycleSessionVariants, getUnitAvailability } from "@/lib/services/admission-service";
+import {
+  buildTradeCycleSessionVariants,
+  countTwoYearConcurrentSeatUsers,
+  getUnitAvailability
+} from "@/lib/services/admission-service";
 import type { SelectOption } from "@/lib/types";
 
 export type AdmissionDeskFilters = {
@@ -133,10 +137,10 @@ function buildStudentWhere(filters: AdmissionDeskFilters) {
     ...(search
       ? {
           OR: [
-            { fullName: { contains: search, mode: "insensitive" as const } },
-            { studentCode: { contains: search, mode: "insensitive" as const } },
-            { mobile: { contains: search, mode: "insensitive" as const } },
-            { fatherName: { contains: search, mode: "insensitive" as const } }
+            { fullName: { startsWith: search, mode: "insensitive" as const } },
+            { studentCode: { startsWith: search, mode: "insensitive" as const } },
+            { mobile: { startsWith: search, mode: "insensitive" as const } },
+            { fatherName: { startsWith: search, mode: "insensitive" as const } }
           ]
         }
       : {})
@@ -148,8 +152,20 @@ export async function getAdmissionDeskData(filters: AdmissionDeskFilters = {}): 
   const sessionConfig = await readSessionConfig();
   const activeSessions = [sessionConfig.activeOneYearSession, sessionConfig.activeTwoYearSession].filter(Boolean);
 
-  const [classificationMasters, institutes, trades, totalInquiries, totalAdmissions, pendingDocuments, canceledAdmissions, students, groupedByTrade, groupedBySession, groupedByYear] =
-    await Promise.all([
+  const [
+    classificationMasters,
+    institutes,
+    trades,
+    totalInquiries,
+    totalAdmissions,
+    pendingDocuments,
+    canceledAdmissions,
+    students,
+    groupedByTrade,
+    groupedBySession,
+    groupedByYear,
+    distinctSessionRows
+  ] = await Promise.all([
       readClassificationMasters(),
       prisma.institute.findMany({
         where: { status: true },
@@ -213,6 +229,12 @@ export async function getAdmissionDeskData(filters: AdmissionDeskFilters = {}): 
         _count: {
           _all: true
         }
+      }),
+      prisma.student.findMany({
+        where: { deletedAt: null },
+        distinct: ["session"],
+        select: { session: true },
+        orderBy: { session: "desc" }
       })
     ]);
 
@@ -246,19 +268,22 @@ export async function getAdmissionDeskData(filters: AdmissionDeskFilters = {}): 
         : [];
       const totalCapacity = units.reduce((sum, item) => sum + item.capacity, 0);
       const groupedUsedSeats = units.reduce((sum, item) => sum + item.used, 0);
-      const usedSeats = await prisma.student.count({
-        where: {
-          deletedAt: null,
-          institute: {
-            instituteCode: trade.institute.instituteCode
-          },
-          trade: {
-            tradeCode: trade.tradeCode
-          },
-          ...(cycleSessionVariants.length ? { session: { in: cycleSessionVariants } } : {}),
-          ...(seatConfig?.durationYears === 1 ? { yearLabel: filters.yearLabel || "1st" } : {})
-        }
-      });
+      const usedSeats =
+        seatConfig?.durationYears === 2 && tradeSession
+          ? await countTwoYearConcurrentSeatUsers(trade.instituteId, trade.id, tradeSession)
+          : await prisma.student.count({
+              where: {
+                deletedAt: null,
+                institute: {
+                  instituteCode: trade.institute.instituteCode
+                },
+                trade: {
+                  tradeCode: trade.tradeCode
+                },
+                ...(cycleSessionVariants.length ? { session: { in: cycleSessionVariants } } : {}),
+                ...(seatConfig?.durationYears === 1 ? { yearLabel: filters.yearLabel || "1st" } : {})
+              }
+            });
       const unassignedSeats = Math.max(usedSeats - groupedUsedSeats, 0);
       const vacant = Math.max(totalCapacity - usedSeats, 0);
 
@@ -336,7 +361,14 @@ export async function getAdmissionDeskData(filters: AdmissionDeskFilters = {}): 
         label: `${item.institute.instituteCode} - ${item.name}`,
         value: `${item.institute.instituteCode}::${item.tradeCode}`
       })),
-      sessions: Array.from(new Set(students.map((item) => item.session).concat(activeSessions)))
+      sessions: Array.from(
+        new Set(
+          distinctSessionRows
+            .map((item) => item.session)
+            .concat(students.map((item) => item.session))
+            .concat(activeSessions)
+        )
+      )
         .filter(Boolean)
         .map((item) => normalizeSessionLabel(item))
         .filter(Boolean)

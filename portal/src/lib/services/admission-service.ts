@@ -1,4 +1,15 @@
-import { AdmissionMode, DocumentTypeCode, EducationLevel, Gender, ParentRelation, PaymentStatus, ScholarshipStatus, StudentStatus, VerificationStatus } from "@prisma/client";
+import {
+  AdmissionMode,
+  DocumentTypeCode,
+  EducationLevel,
+  Gender,
+  ParentRelation,
+  PaymentStatus,
+  Prisma,
+  ScholarshipStatus,
+  StudentStatus,
+  VerificationStatus
+} from "@prisma/client";
 import { tradeUnitCatalog } from "@/lib/constants";
 import { reserveGeneratedCode } from "@/lib/numbering-config";
 import { prisma } from "@/lib/prisma";
@@ -39,6 +50,134 @@ export function buildTradeCycleSessionVariants(session: string, durationYears: n
       ...buildSessionVariants(oneYearStyleFull)
     ])
   );
+}
+
+/**
+ * For a 2-year cycle label like `2026-28` (cohort starting calendar year 2026), returns the
+ * immediately prior cycle `2025-27`. Workshop seats are shared: 1st-year students in the current
+ * cycle occupy seats together with 2nd-year students still in the previous cycle until that batch
+ * completes (then only the next overlap applies, e.g. 2027-29 1st + 2026-28 2nd).
+ */
+export function previousTwoYearCycleSession(session: string): string | null {
+  const normalized = normalizeSessionLabel((session || "").trim());
+  if (!normalized.includes("-")) return null;
+  const [left] = normalized.split("-");
+  const startYear = Number(left);
+  if (!Number.isFinite(startYear)) return null;
+  const prevStart = startYear - 1;
+  const endYear = prevStart + 2;
+  return `${prevStart}-${String(endYear).slice(-2)}`;
+}
+
+async function loadTwoYearConcurrentSeatUsageByUnit(
+  instituteId: string,
+  tradeId: string,
+  session: string
+): Promise<Map<number, number>> {
+  const variantsS = buildTradeCycleSessionVariants(session, 2);
+  const prev = previousTwoYearCycleSession(session);
+  const variantsPrev = prev ? buildTradeCycleSessionVariants(prev, 2) : [];
+  const base = { instituteId, tradeId, deletedAt: null };
+
+  const [firstRows, secondRows] = await Promise.all([
+    prisma.student.groupBy({
+      by: ["unitNumber"],
+      where: {
+        ...base,
+        yearLabel: "1st",
+        ...(variantsS.length ? { session: { in: variantsS } } : {})
+      },
+      _count: { _all: true }
+    }),
+    variantsPrev.length
+      ? prisma.student.groupBy({
+          by: ["unitNumber"],
+          where: {
+            ...base,
+            yearLabel: "2nd",
+            session: { in: variantsPrev }
+          },
+          _count: { _all: true }
+        })
+      : Promise.resolve([])
+  ]);
+
+  const usedByUnit = new Map<number, number>();
+  for (const row of firstRows) {
+    if (row.unitNumber != null) {
+      usedByUnit.set(row.unitNumber, (usedByUnit.get(row.unitNumber) || 0) + row._count._all);
+    }
+  }
+  for (const row of secondRows) {
+    if (row.unitNumber != null) {
+      usedByUnit.set(row.unitNumber, (usedByUnit.get(row.unitNumber) || 0) + row._count._all);
+    }
+  }
+  return usedByUnit;
+}
+
+/** Total students counted against seat capacity for a 2-year trade in `session` (all units). */
+export async function countTwoYearConcurrentSeatUsers(instituteId: string, tradeId: string, session: string): Promise<number> {
+  const byUnit = await loadTwoYearConcurrentSeatUsageByUnit(instituteId, tradeId, session);
+  let sum = 0;
+  for (const n of byUnit.values()) sum += n;
+  return sum;
+}
+
+export async function countStudentsOnUnitForAdmission(params: {
+  instituteId: string;
+  tradeId: string;
+  tradeKey: string;
+  unitNumber: number;
+  session: string;
+  yearLabel: string;
+  excludeStudentId?: string;
+}): Promise<number> {
+  const tradeConfig = tradeUnitCatalog[params.tradeKey];
+  if (!tradeConfig) return 0;
+
+  const base: Prisma.StudentWhereInput = {
+    instituteId: params.instituteId,
+    tradeId: params.tradeId,
+    unitNumber: params.unitNumber,
+    deletedAt: null,
+    ...(params.excludeStudentId ? { NOT: { id: params.excludeStudentId } } : {})
+  };
+
+  if (tradeConfig.durationYears <= 1) {
+    const variants = buildTradeCycleSessionVariants(params.session, 1);
+    return prisma.student.count({
+      where: {
+        ...base,
+        ...(variants.length ? { session: { in: variants } } : {}),
+        yearLabel: params.yearLabel
+      }
+    });
+  }
+
+  const variantsS = buildTradeCycleSessionVariants(params.session, 2);
+
+  if (params.yearLabel === "1st") {
+    const prev = previousTwoYearCycleSession(params.session);
+    const variantsPrev = prev ? buildTradeCycleSessionVariants(prev, 2) : [];
+    const orBranch: Prisma.StudentWhereInput[] = [{ session: { in: variantsS }, yearLabel: "1st" }];
+    if (variantsPrev.length) {
+      orBranch.push({ session: { in: variantsPrev }, yearLabel: "2nd" });
+    }
+    return prisma.student.count({
+      where: {
+        ...base,
+        OR: orBranch
+      }
+    });
+  }
+
+  return prisma.student.count({
+    where: {
+      ...base,
+      ...(variantsS.length ? { session: { in: variantsS } } : {})
+    }
+  });
 }
 
 function toCapitalizedWords(value?: string | null) {
@@ -134,24 +273,29 @@ export async function getUnitAvailability(tradeId: string, session: string, year
 
   const sessionVariants = buildTradeCycleSessionVariants(session, tradeConfig.durationYears);
 
-  const students = await prisma.student.groupBy({
-    by: ["unitNumber"],
-    where: {
-      instituteId: institute.id,
-      tradeId: trade.id,
-      ...(sessionVariants.length ? { session: { in: sessionVariants } } : {}),
-      ...(tradeConfig.durationYears <= 1 && yearLabel ? { yearLabel } : {}),
-      deletedAt: null
-    },
-    _count: {
-      _all: true
-    }
-  });
+  let usedByUnit: Map<number, number>;
 
-  const usedByUnit = new Map<number, number>();
-  for (const row of students) {
-    if (row.unitNumber) {
-      usedByUnit.set(row.unitNumber, row._count._all);
+  if (tradeConfig.durationYears === 2) {
+    usedByUnit = await loadTwoYearConcurrentSeatUsageByUnit(institute.id, trade.id, session);
+  } else {
+    const students = await prisma.student.groupBy({
+      by: ["unitNumber"],
+      where: {
+        instituteId: institute.id,
+        tradeId: trade.id,
+        ...(sessionVariants.length ? { session: { in: sessionVariants } } : {}),
+        ...(tradeConfig.durationYears <= 1 && yearLabel ? { yearLabel } : {}),
+        deletedAt: null
+      },
+      _count: {
+        _all: true
+      }
+    });
+    usedByUnit = new Map<number, number>();
+    for (const row of students) {
+      if (row.unitNumber) {
+        usedByUnit.set(row.unitNumber, row._count._all);
+      }
     }
   }
 
@@ -267,15 +411,13 @@ export async function createAdmission(rawPayload: unknown, currentUserId?: strin
   const eligibilityStatus = payload.isPassed ? VerificationStatus.PENDING : VerificationStatus.REJECTED;
   const finalFees = trade.standardFees ?? 0;
 
-  const existingUnitCount = await prisma.student.count({
-    where: {
-      instituteId: institute.id,
-      tradeId: trade.id,
-      session: { in: buildTradeCycleSessionVariants(normalizedSession, tradeConfig.durationYears) },
-      ...(tradeConfig.durationYears <= 1 ? { yearLabel: payload.yearLabel } : {}),
-      unitNumber: payload.unitNumber,
-      deletedAt: null
-    }
+  const existingUnitCount = await countStudentsOnUnitForAdmission({
+    instituteId: institute.id,
+    tradeId: trade.id,
+    tradeKey: payload.tradeId,
+    unitNumber: payload.unitNumber,
+    session: normalizedSession,
+    yearLabel: payload.yearLabel
   });
 
   if (existingUnitCount >= tradeConfig.seatsPerUnit) {
