@@ -7,6 +7,7 @@ import {
   PaymentStatus,
   Prisma,
   ScholarshipStatus,
+  StudentLifecycleStage,
   StudentStatus,
   VerificationStatus
 } from "@prisma/client";
@@ -25,6 +26,11 @@ function parseTradeKey(tradeKey: string) {
   const [instituteCode, tradeCode] = tradeKey.split("::");
   return { instituteCode, tradeCode };
 }
+
+/** Workshop seat capacity counts only learners still on-roll (not alumni/archived). */
+const workshopSeatLifecycleWhere: Pick<Prisma.StudentWhereInput, "lifecycleStage"> = {
+  lifecycleStage: { in: [StudentLifecycleStage.ACTIVE, StudentLifecycleStage.PROMOTED] }
+};
 
 export function buildTradeCycleSessionVariants(session: string, durationYears: number) {
   const normalized = normalizeSessionLabel(session);
@@ -77,7 +83,7 @@ async function loadTwoYearConcurrentSeatUsageByUnit(
   const variantsS = buildTradeCycleSessionVariants(session, 2);
   const prev = previousTwoYearCycleSession(session);
   const variantsPrev = prev ? buildTradeCycleSessionVariants(prev, 2) : [];
-  const base = { instituteId, tradeId, deletedAt: null };
+  const base = { instituteId, tradeId, deletedAt: null, ...workshopSeatLifecycleWhere };
 
   const [firstRows, secondRows] = await Promise.all([
     prisma.student.groupBy({
@@ -141,6 +147,7 @@ export async function countStudentsOnUnitForAdmission(params: {
     tradeId: params.tradeId,
     unitNumber: params.unitNumber,
     deletedAt: null,
+    ...workshopSeatLifecycleWhere,
     ...(params.excludeStudentId ? { NOT: { id: params.excludeStudentId } } : {})
   };
 
@@ -285,7 +292,8 @@ export async function getUnitAvailability(tradeId: string, session: string, year
         tradeId: trade.id,
         ...(sessionVariants.length ? { session: { in: sessionVariants } } : {}),
         ...(tradeConfig.durationYears <= 1 && yearLabel ? { yearLabel } : {}),
-        deletedAt: null
+        deletedAt: null,
+        ...workshopSeatLifecycleWhere
       },
       _count: {
         _all: true
