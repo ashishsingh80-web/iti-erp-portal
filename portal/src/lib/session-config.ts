@@ -1,6 +1,4 @@
-import { mkdir, readFile, writeFile } from "fs/promises";
-import path from "path";
-import { cache } from "react";
+import { prisma } from "@/lib/prisma";
 
 export type SessionConfig = {
   activeOneYearSession: string;
@@ -45,8 +43,6 @@ export function buildSessionVariants(value?: string | null) {
   return Array.from(new Set([raw, normalized, shortVariant].filter(Boolean)));
 }
 
-const sessionConfigPath = path.join(process.cwd(), "data", "session-config.json");
-
 function toTwoDigitYear(year: number) {
   return String(year).slice(-2);
 }
@@ -67,27 +63,36 @@ export function buildDefaultSessionConfig(date = new Date()): SessionConfig {
 
 async function loadSessionConfig(): Promise<SessionConfig> {
   try {
-    const raw = await readFile(sessionConfigPath, "utf8");
-    const parsed = JSON.parse(raw) as Partial<SessionConfig>;
+    const latest = await prisma.auditLog.findFirst({
+      where: {
+        module: "SETTINGS",
+        action: "SESSION_CONFIG_UPDATED"
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metadataJson: true, createdAt: true }
+    });
+    const parsed = latest?.metadataJson ? (JSON.parse(latest.metadataJson) as Partial<SessionConfig>) : null;
     const fallback = buildDefaultSessionConfig();
 
     return {
       activeOneYearSession:
-        typeof parsed.activeOneYearSession === "string" && parsed.activeOneYearSession.trim()
+        typeof parsed?.activeOneYearSession === "string" && parsed.activeOneYearSession.trim()
           ? normalizeSessionLabel(parsed.activeOneYearSession)
           : fallback.activeOneYearSession,
       activeTwoYearSession:
-        typeof parsed.activeTwoYearSession === "string" && parsed.activeTwoYearSession.trim()
+        typeof parsed?.activeTwoYearSession === "string" && parsed.activeTwoYearSession.trim()
           ? normalizeSessionLabel(parsed.activeTwoYearSession)
           : fallback.activeTwoYearSession,
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null
+      updatedAt: typeof parsed?.updatedAt === "string" ? parsed.updatedAt : latest?.createdAt?.toISOString() || null
     };
   } catch {
     return buildDefaultSessionConfig();
   }
 }
 
-export const readSessionConfig = cache(loadSessionConfig);
+export async function readSessionConfig() {
+  return loadSessionConfig();
+}
 
 export async function saveSessionConfig(input: Omit<SessionConfig, "updatedAt">) {
   const payload: SessionConfig = {
@@ -96,8 +101,13 @@ export async function saveSessionConfig(input: Omit<SessionConfig, "updatedAt">)
     updatedAt: new Date().toISOString()
   };
 
-  await mkdir(path.dirname(sessionConfigPath), { recursive: true });
-  await writeFile(sessionConfigPath, JSON.stringify(payload, null, 2), "utf8");
+  await prisma.auditLog.create({
+    data: {
+      module: "SETTINGS",
+      action: "SESSION_CONFIG_UPDATED",
+      metadataJson: JSON.stringify(payload)
+    }
+  });
 
   return payload;
 }

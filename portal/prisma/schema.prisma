@@ -1370,3 +1370,10 @@ model NumberingConfigStore {
   configJson Json
   updatedAt  DateTime @updatedAt
 }
+
+/// Per-user JWT/session invalidation watermark (replaces local JSON on Vercel).
+model UserSessionRevocation {
+  userId        String   @id
+  invalidBefore DateTime
+  updatedAt     DateTime @updatedAt
+}

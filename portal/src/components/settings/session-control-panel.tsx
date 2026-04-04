@@ -2,23 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { showToast } from "@/lib/toast";
+import { normalizeSessionLabel } from "@/lib/session-utils";
 import { SkeletonBlock } from "@/components/ui/skeleton-block";
 
 function buildSessionOptions(selectedValue: string) {
-  const currentYear = new Date().getFullYear() % 100;
+  const currentYear = new Date().getFullYear();
   const options = new Set<string>();
 
-  for (let offset = -1; offset <= 3; offset += 1) {
-    const start = currentYear + offset;
-    options.add(`${String(start).padStart(2, "0")}-${String(start + 1).padStart(2, "0")}`);
-    options.add(`${String(start).padStart(2, "0")}-${String(start + 2).padStart(2, "0")}`);
+  // Always store/display canonical YYYY-YY (e.g. 2025-26), never legacy 25-26 in the dropdown.
+  for (let offset = -5; offset <= 10; offset += 1) {
+    const startFull = currentYear + offset;
+    const end1 = startFull + 1;
+    const end2 = startFull + 2;
+    const one = normalizeSessionLabel(`${startFull}-${String(end1).slice(-2)}`);
+    const two = normalizeSessionLabel(`${startFull}-${String(end2).slice(-2)}`);
+    if (one) options.add(one);
+    if (two) options.add(two);
   }
 
   if (selectedValue.trim()) {
-    options.add(selectedValue.trim());
+    const n = normalizeSessionLabel(selectedValue.trim());
+    if (n) options.add(n);
   }
 
-  return Array.from(options).sort();
+  return Array.from(options).sort((a, b) => {
+    const ay = parseInt(a.split("-")[0] || "0", 10) || 0;
+    const by = parseInt(b.split("-")[0] || "0", 10) || 0;
+    if (ay !== by) return ay - by;
+    return a.localeCompare(b);
+  });
 }
 
 export function SessionControlPanel() {
@@ -49,8 +61,8 @@ export function SessionControlPanel() {
     }
 
     setForm({
-      activeOneYearSession: String(result.config?.activeOneYearSession || ""),
-      activeTwoYearSession: String(result.config?.activeTwoYearSession || "")
+      activeOneYearSession: normalizeSessionLabel(String(result.config?.activeOneYearSession || "")) || "",
+      activeTwoYearSession: normalizeSessionLabel(String(result.config?.activeTwoYearSession || "")) || ""
     });
     setOneYearMode("choose");
     setTwoYearMode("choose");
@@ -84,8 +96,8 @@ export function SessionControlPanel() {
     }
 
     setForm({
-      activeOneYearSession: String(result.config?.activeOneYearSession || ""),
-      activeTwoYearSession: String(result.config?.activeTwoYearSession || "")
+      activeOneYearSession: normalizeSessionLabel(String(result.config?.activeOneYearSession || "")) || "",
+      activeTwoYearSession: normalizeSessionLabel(String(result.config?.activeTwoYearSession || "")) || ""
     });
     setUpdatedAt(String(result.config?.updatedAt || ""));
     showToast({ kind: "success", title: "Session settings saved", message: "Admission and dashboard now use the updated active sessions." });
