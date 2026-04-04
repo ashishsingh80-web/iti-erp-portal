@@ -28,7 +28,7 @@ function parseTradeKey(tradeKey: string) {
 }
 
 /** Workshop seat capacity counts only learners still on-roll (not alumni/archived). */
-const workshopSeatLifecycleWhere: Pick<Prisma.StudentWhereInput, "lifecycleStage"> = {
+export const workshopSeatLifecycleWhere: Pick<Prisma.StudentWhereInput, "lifecycleStage"> = {
   lifecycleStage: { in: [StudentLifecycleStage.ACTIVE, StudentLifecycleStage.PROMOTED] }
 };
 

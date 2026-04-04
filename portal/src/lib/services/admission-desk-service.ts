@@ -6,7 +6,8 @@ import { buildSessionVariants, normalizeSessionLabel, readSessionConfig } from "
 import {
   buildTradeCycleSessionVariants,
   countTwoYearConcurrentSeatUsers,
-  getUnitAvailability
+  getUnitAvailability,
+  workshopSeatLifecycleWhere
 } from "@/lib/services/admission-service";
 import type { SelectOption } from "@/lib/types";
 
@@ -274,6 +275,7 @@ export async function getAdmissionDeskData(filters: AdmissionDeskFilters = {}): 
           : await prisma.student.count({
               where: {
                 deletedAt: null,
+                ...workshopSeatLifecycleWhere,
                 institute: {
                   instituteCode: trade.institute.instituteCode
                 },
