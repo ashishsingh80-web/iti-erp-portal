@@ -38,9 +38,6 @@ Use at least:
 
 Optional (if used):
 
-- `GOOGLE_DRIVE_ROOT_FOLDER_ID`
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
 - `NOTIFY_SMS_WEBHOOK_URL`
 - `NOTIFY_WHATSAPP_WEBHOOK_URL`
 - `NOTIFY_EMAIL_WEBHOOK_URL`
@@ -51,8 +48,11 @@ Optional (if used):
 Trigger the first deployment from Vercel.
 
 `npm run vercel-build` will:
-- run `prisma migrate deploy`
+- run `prisma migrate deploy` (needs **`DATABASE_URL`** set for Production on Vercel)
+- run `prisma generate`
 - run `next build`
+
+To run only migrations from your machine using env stored in Vercel: `npm run migrate:vercel-production` (after `npx vercel link`).
 
 ## 6) Verify After Deploy
 
@@ -66,7 +66,7 @@ Trigger the first deployment from Vercel.
 
 This codebase writes some files into `public/uploads` on disk. Vercel serverless file storage is ephemeral and not suitable for persistent uploads.
 
-Before production go-live, move runtime uploads to persistent storage (for example S3/R2/Supabase Storage/Cloudinary/Drive integration), then store only URLs in DB.
+Before production go-live, move runtime uploads to persistent storage (for example S3/R2/Supabase Storage/Cloudinary), then store only URLs in DB.
 
 ## Useful Commands
 

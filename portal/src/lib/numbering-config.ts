@@ -1,5 +1,7 @@
+import { Prisma } from "@prisma/client";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import { prisma } from "@/lib/prisma";
 
 export type NumberingKind = "student" | "agent" | "employee" | "receipt";
 
@@ -28,8 +30,14 @@ export type NumberingContext = {
   date?: Date | null;
 };
 
+const STORE_ID = "default";
 const numberingConfigPath = path.join(process.cwd(), "data", "numbering-config.json");
 let reserveQueue: Promise<void> = Promise.resolve();
+
+/** Vercel serverless filesystem under /var/task is read-only — never use local JSON there. */
+function allowNumberingFilesystem() {
+  return process.env.VERCEL !== "1";
+}
 
 function defaultRule(input: Partial<NumberingRule>): NumberingRule {
   return {
@@ -65,8 +73,20 @@ function normalizeRule(input: Partial<NumberingRule> | undefined, fallback: Numb
   };
 }
 
-export async function readNumberingConfig(): Promise<NumberingConfig> {
-  const fallback = buildDefaultNumberingConfig();
+function parseStoredConfig(raw: unknown, fallback: NumberingConfig): NumberingConfig {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return fallback;
+  const parsed = raw as Partial<NumberingConfig>;
+  return {
+    student: normalizeRule(parsed.student, fallback.student),
+    agent: normalizeRule(parsed.agent, fallback.agent),
+    employee: normalizeRule(parsed.employee, fallback.employee),
+    receipt: normalizeRule(parsed.receipt, fallback.receipt),
+    updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null
+  };
+}
+
+async function readNumberingConfigFromFilesystem(fallback: NumberingConfig): Promise<NumberingConfig> {
+  if (!allowNumberingFilesystem()) return fallback;
   try {
     const raw = await readFile(numberingConfigPath, "utf8");
     const parsed = JSON.parse(raw) as Partial<NumberingConfig>;
@@ -82,6 +102,21 @@ export async function readNumberingConfig(): Promise<NumberingConfig> {
   }
 }
 
+export async function readNumberingConfig(): Promise<NumberingConfig> {
+  const fallback = buildDefaultNumberingConfig();
+  try {
+    const row = await prisma.numberingConfigStore.findUnique({ where: { id: STORE_ID } });
+    if (row) return parseStoredConfig(row.configJson, fallback);
+  } catch {
+    // e.g. migration not applied yet — fall back to file/defaults
+  }
+  return readNumberingConfigFromFilesystem(fallback);
+}
+
+function toJsonPayload(config: NumberingConfig): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(config)) as Prisma.InputJsonValue;
+}
+
 export async function saveNumberingConfig(input: Omit<NumberingConfig, "updatedAt">) {
   const fallback = buildDefaultNumberingConfig();
   const payload: NumberingConfig = {
@@ -92,8 +127,31 @@ export async function saveNumberingConfig(input: Omit<NumberingConfig, "updatedA
     updatedAt: new Date().toISOString()
   };
 
-  await mkdir(path.dirname(numberingConfigPath), { recursive: true });
-  await writeFile(numberingConfigPath, JSON.stringify(payload, null, 2), "utf8");
+  try {
+    await prisma.numberingConfigStore.upsert({
+      where: { id: STORE_ID },
+      create: { id: STORE_ID, configJson: toJsonPayload(payload) },
+      update: { configJson: toJsonPayload(payload) }
+    });
+  } catch (e) {
+    if (!allowNumberingFilesystem()) throw e;
+    try {
+      await mkdir(path.dirname(numberingConfigPath), { recursive: true });
+      await writeFile(numberingConfigPath, JSON.stringify(payload, null, 2), "utf8");
+    } catch {
+      throw e;
+    }
+    return payload;
+  }
+
+  if (allowNumberingFilesystem()) {
+    try {
+      await mkdir(path.dirname(numberingConfigPath), { recursive: true });
+      await writeFile(numberingConfigPath, JSON.stringify(payload, null, 2), "utf8");
+    } catch {
+      // local dev only — ignore
+    }
+  }
   return payload;
 }
 
@@ -127,6 +185,54 @@ export async function previewGeneratedCode(kind: NumberingKind, context: Numberi
   return generateCodeFromRule(rule, context, rule.nextNumber);
 }
 
+async function reserveGeneratedCodeInDb(kind: NumberingKind, context: NumberingContext): Promise<string> {
+  const fallback = buildDefaultNumberingConfig();
+  const maxAttempts = 8;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const row = await tx.numberingConfigStore.findUnique({ where: { id: STORE_ID } });
+          const config = row?.configJson
+            ? parseStoredConfig(row.configJson, fallback)
+            : allowNumberingFilesystem()
+              ? await readNumberingConfigFromFilesystem(fallback)
+              : fallback;
+
+          const rule = config[kind];
+          const sequence = rule.nextNumber;
+          const code = generateCodeFromRule(rule, context, sequence);
+          config[kind] = {
+            ...rule,
+            nextNumber: Math.max(sequence + 1, rule.startNumber)
+          };
+          config.updatedAt = new Date().toISOString();
+
+          await tx.numberingConfigStore.upsert({
+            where: { id: STORE_ID },
+            create: { id: STORE_ID, configJson: toJsonPayload(config) },
+            update: { configJson: toJsonPayload(config) }
+          });
+          return code;
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+          maxWait: 15_000,
+          timeout: 15_000
+        }
+      );
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034" && attempt < maxAttempts - 1) {
+        continue;
+      }
+      throw e;
+    }
+  }
+
+  throw new Error("Unable to reserve code after retries");
+}
+
 export async function reserveGeneratedCode(kind: NumberingKind, context: NumberingContext = {}) {
   const previous = reserveQueue;
   let release: (() => void) | undefined;
@@ -136,21 +242,7 @@ export async function reserveGeneratedCode(kind: NumberingKind, context: Numberi
 
   await previous;
   try {
-    const config = await readNumberingConfig();
-    const rule = config[kind];
-    const sequence = rule.nextNumber;
-    const code = generateCodeFromRule(rule, context, sequence);
-    config[kind] = {
-      ...rule,
-      nextNumber: Math.max(sequence + 1, rule.startNumber)
-    };
-    await saveNumberingConfig({
-      student: config.student,
-      agent: config.agent,
-      employee: config.employee,
-      receipt: config.receipt
-    });
-    return code;
+    return await reserveGeneratedCodeInDb(kind, context);
   } finally {
     release?.();
   }

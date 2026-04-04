@@ -70,18 +70,23 @@ If your Neon region is not listed, open **Vercel → Functions** docs for the fu
 
 ### Vercel build and Prisma migrations
 
-The **`vercel-build`** script runs **`prisma generate`** and **`next build`** only. It does **not** run `prisma migrate deploy` during the Vercel build, because that needs a live TCP connection to Postgres and often fails with **P1001** (can’t reach database) when Neon is sleeping, the URL is wrong, or the build environment cannot reach the host.
+The **`vercel-build`** script runs **`prisma migrate deploy`**, then **`prisma generate`**, then **`next build`**. Each production deploy applies pending migrations against the database in **`DATABASE_URL`**.
 
-**Apply schema changes to production:**
+**Requirements**
 
-1. From your machine (with network), using the **same pooled `DATABASE_URL` as production:**
-   ```bash
-   cd portal && npx prisma migrate deploy
-   ```
-2. Or open the Neon dashboard, wake the project if it was suspended, confirm the connection string, then run the command above.
+- Link this folder to the correct Vercel project (production is **`iti-erp-portal`**, not a generic `portal` project):  
+  `npx vercel link --project iti-erp-portal`
+- Set **`DATABASE_URL`** on that Vercel project (Production) to your Neon URI (Vercel **Neon** integration or paste from Neon **Connection details**).
+- Neon must accept TCP from Vercel’s build network. If a deploy fails with **P1001**, wake the Neon project or use a connection string that allows the build to connect (some teams use a non-pooled “direct” URI only for migrations via a separate env var and a custom build script).
 
-After new migrations exist, deploy the app as usual; the running app uses Prisma Client generated at build time and must match a database that already has those migrations applied.
+**Apply migrations from your laptop (same DB as production)**
 
-Optional: if you prefer migrations to run on every Vercel deploy and your Neon URL is reliable from Vercel’s build, set the project **Build Command** to  
-`npx prisma migrate deploy && npm run vercel-build`  
-(or equivalent) in the Vercel dashboard instead of changing `package.json`.
+```bash
+cd portal && npm run migrate:vercel-production
+```
+
+This pulls Production env with the Vercel CLI (after `npx vercel link`) and runs `prisma migrate deploy`. You can instead set `DATABASE_URL` manually:
+
+```bash
+cd portal && DATABASE_URL="postgresql://…" npx prisma migrate deploy
+```

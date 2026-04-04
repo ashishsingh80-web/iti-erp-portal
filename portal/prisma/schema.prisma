@@ -1363,3 +1363,10 @@ model PlacementRecord {
   @@index([placementStatus, apprenticeshipStatus, createdAt])
   @@index([studentId, companyId])
 }
+
+/// Singleton row (id = "default") for student/agent/employee/receipt code sequences — required on serverless (read-only filesystem).
+model NumberingConfigStore {
+  id         String   @id
+  configJson Json
+  updatedAt  DateTime @updatedAt
+}
