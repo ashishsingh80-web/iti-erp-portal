@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type { Route } from "next";
 import { showToast } from "@/lib/toast";
+import { t } from "@/lib/i18n";
+import { useAppLanguage } from "@/lib/use-app-language";
 
 type DocumentRow = {
   id: string;
@@ -51,13 +56,18 @@ const documentTypeOptions = [
   "OTHER"
 ];
 
-export function DocumentsDesk() {
+export function DocumentsDesk({ initialStatus = "" }: { initialStatus?: string }) {
+  const lang = useAppLanguage();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlStatus = searchParams.get("status") ?? initialStatus ?? "";
   const [rows, setRows] = useState<DocumentRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(urlStatus);
   const [refreshKey, setRefreshKey] = useState(0);
+  const skipUrlReload = useRef(true);
   const [uploading, setUploading] = useState(false);
   const [uploadForm, setUploadForm] = useState({
     studentId: "",
@@ -75,7 +85,7 @@ export function DocumentsDesk() {
     const response = await fetch(`/api/documents?${params.toString()}`);
     const result = (await response.json().catch(() => ({ ok: false, rows: [], counts: {}, pagination: null }))) as DocumentListResponse;
     if (!response.ok) {
-      showToast({ kind: "error", title: "Documents not loaded", message: result.message || "Unable to load documents." });
+      showToast({ kind: "error", title: t(lang, "Documents not loaded"), message: result.message || t(lang, "Unable to load documents.") });
       setRows([]);
       setCounts({});
       setLoading(false);
@@ -85,6 +95,15 @@ export function DocumentsDesk() {
     setCounts(result.counts || {});
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (skipUrlReload.current) {
+      skipUrlReload.current = false;
+      return;
+    }
+    setStatus(urlStatus);
+    setRefreshKey((k) => k + 1);
+  }, [urlStatus]);
 
   useEffect(() => {
     void loadRows();
@@ -98,7 +117,11 @@ export function DocumentsDesk() {
         ? window.prompt("Optional remark for marking pending:", row.remarks || "") || ""
         : window.prompt(`Remark for ${nextStatus.toLowerCase()}:`, row.remarks || defaultRemark) || "";
     if ((nextStatus === "REJECTED" || nextStatus === "INCOMPLETE") && !remarks.trim()) {
-      showToast({ kind: "error", title: "Remark required", message: `Please add a remark before marking ${nextStatus.toLowerCase()}.` });
+      showToast({
+        kind: "error",
+        title: t(lang, "Remark required"),
+        message: `${t(lang, "Please add a remark before marking")} ${nextStatus.toLowerCase()}.`
+      });
       return;
     }
     const response = await fetch(`/api/documents/${row.id}`, {
@@ -108,21 +131,25 @@ export function DocumentsDesk() {
     });
     const result = await response.json().catch(() => null);
     if (!response.ok) {
-      showToast({ kind: "error", title: "Status not updated", message: result?.message || "Unable to update verification status." });
+      showToast({
+        kind: "error",
+        title: t(lang, "Status not updated"),
+        message: result?.message || t(lang, "Unable to update verification status.")
+      });
       return;
     }
-    showToast({ kind: "success", title: "Status updated", message: `${row.student.fullName} - ${nextStatus}` });
+    showToast({ kind: "success", title: t(lang, "Status updated"), message: `${row.student.fullName} - ${nextStatus}` });
     setRefreshKey((current) => current + 1);
   }
 
   async function uploadDocument(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!uploadForm.studentId.trim()) {
-      showToast({ kind: "error", title: "Student required", message: "Enter a valid student ID." });
+      showToast({ kind: "error", title: t(lang, "Student required"), message: t(lang, "Enter a valid student ID.") });
       return;
     }
     if (!uploadForm.file) {
-      showToast({ kind: "error", title: "File required", message: "Select a file to upload." });
+      showToast({ kind: "error", title: t(lang, "File required"), message: t(lang, "Select a file to upload.") });
       return;
     }
 
@@ -138,10 +165,10 @@ export function DocumentsDesk() {
     const result = await response.json().catch(() => null);
     setUploading(false);
     if (!response.ok) {
-      showToast({ kind: "error", title: "Upload failed", message: result?.message || "Unable to upload document." });
+      showToast({ kind: "error", title: t(lang, "Upload failed"), message: result?.message || t(lang, "Unable to upload document.") });
       return;
     }
-    showToast({ kind: "success", title: "Document uploaded", message: "Document added to verification queue." });
+    showToast({ kind: "success", title: t(lang, "Document uploaded"), message: t(lang, "Document added to verification queue.") });
     setUploadForm({
       studentId: "",
       documentType: "OTHER",
@@ -156,70 +183,86 @@ export function DocumentsDesk() {
     <section className="surface p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Documents Module</p>
-          <h3 className="mt-2 text-2xl font-semibold text-slate-900">Document Verification Desk</h3>
-          <p className="mt-1 text-sm text-slate-600">Verify, reject, remark, and upload documents from one workspace.</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-slate-500">{t(lang, "Documents Module")}</p>
+          <h3 className="mt-2 text-2xl font-semibold text-slate-900">{t(lang, "Document Verification Desk")}</h3>
+          <p className="mt-1 text-sm text-slate-600">{t(lang, "Verify, reject, remark, and upload documents from one workspace.")}</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="chip-warning">Pending: {counts.PENDING || 0}</span>
-          <span className="chip-success">Verified: {counts.VERIFIED || 0}</span>
-          <span className="chip-danger">Rejected: {counts.REJECTED || 0}</span>
-          <span className="chip-neutral">Incomplete: {counts.INCOMPLETE || 0}</span>
+          <Link className="chip-warning transition hover:opacity-90" href={"/modules/documents?status=PENDING" as Route}>
+            {t(lang, "Pending")}: {counts.PENDING || 0}
+          </Link>
+          <Link className="chip-success transition hover:opacity-90" href={"/modules/documents?status=VERIFIED" as Route}>
+            {t(lang, "Verified")}: {counts.VERIFIED || 0}
+          </Link>
+          <Link className="chip-danger transition hover:opacity-90" href={"/modules/documents?status=REJECTED" as Route}>
+            {t(lang, "Rejected")}: {counts.REJECTED || 0}
+          </Link>
+          <Link className="chip-neutral transition hover:opacity-90" href={"/modules/documents?status=INCOMPLETE" as Route}>
+            {t(lang, "Incomplete")}: {counts.INCOMPLETE || 0}
+          </Link>
+          <Link className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700 transition hover:border-emerald-300" href={"/modules/students?tab=verification&queue=docs" as Route}>
+            {t(lang, "Verification workbench")}
+          </Link>
         </div>
       </div>
 
-      <form className="mt-5 grid gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:grid-cols-4" onSubmit={uploadDocument}>
-        <input
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          placeholder="Student ID"
-          value={uploadForm.studentId}
-          onChange={(event) => setUploadForm((current) => ({ ...current, studentId: event.target.value }))}
-        />
-        <select
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          value={uploadForm.documentType}
-          onChange={(event) => setUploadForm((current) => ({ ...current, documentType: event.target.value }))}
-        >
-          {documentTypeOptions.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
-        <select
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
-          value={uploadForm.ownerType}
-          onChange={(event) => setUploadForm((current) => ({ ...current, ownerType: event.target.value }))}
-        >
-          <option value="STUDENT">Student</option>
-          <option value="PARENT">Parent</option>
-        </select>
-        <input
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-          placeholder="Remarks (optional)"
-          value={uploadForm.remarks}
-          onChange={(event) => setUploadForm((current) => ({ ...current, remarks: event.target.value }))}
-        />
-        <input
-          className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-3"
-          type="file"
-          accept=".pdf,.png,.jpg,.jpeg"
-          onChange={(event) => setUploadForm((current) => ({ ...current, file: event.target.files?.[0] || null }))}
-        />
-        <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit" disabled={uploading}>
-          {uploading ? "Uploading..." : "Upload Document"}
-        </button>
-      </form>
+      <details className="mt-5 overflow-hidden rounded-2xl border border-slate-100 bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-800">
+          {t(lang, "Upload New Document")}
+        </summary>
+        <form className="grid gap-3 border-t border-slate-100 p-4 md:grid-cols-4" onSubmit={uploadDocument}>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            placeholder={t(lang, "Student ID")}
+            value={uploadForm.studentId}
+            onChange={(event) => setUploadForm((current) => ({ ...current, studentId: event.target.value }))}
+          />
+          <select
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            value={uploadForm.documentType}
+            onChange={(event) => setUploadForm((current) => ({ ...current, documentType: event.target.value }))}
+          >
+            {documentTypeOptions.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <select
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+            value={uploadForm.ownerType}
+            onChange={(event) => setUploadForm((current) => ({ ...current, ownerType: event.target.value }))}
+          >
+            <option value="STUDENT">{t(lang, "STUDENT")}</option>
+            <option value="PARENT">{t(lang, "Parent")}</option>
+          </select>
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            placeholder={t(lang, "Remarks (optional)")}
+            value={uploadForm.remarks}
+            onChange={(event) => setUploadForm((current) => ({ ...current, remarks: event.target.value }))}
+          />
+          <input
+            className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-3"
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg"
+            onChange={(event) => setUploadForm((current) => ({ ...current, file: event.target.files?.[0] || null }))}
+          />
+          <button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white" type="submit" disabled={uploading}>
+            {uploading ? t(lang, "Uploading...") : t(lang, "Upload Document")}
+          </button>
+        </form>
+      </details>
 
       <div className="mt-4 grid gap-3 rounded-2xl border border-slate-100 bg-white p-4 md:grid-cols-4">
         <input
           className="rounded-xl border border-slate-200 px-3 py-2 text-sm md:col-span-2"
-          placeholder="Search by student, mobile, enrollment, file name"
+          placeholder={t(lang, "Search by student, mobile, enrollment, file name")}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
         <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="">All Status</option>
+          <option value="">{t(lang, "All Status")}</option>
           {statusOptions.map((item) => (
             <option key={item} value={item}>
               {item}
@@ -227,7 +270,19 @@ export function DocumentsDesk() {
           ))}
         </select>
         <button className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800" type="button" onClick={() => setRefreshKey((current) => current + 1)}>
-          Apply Filters
+          {t(lang, "Apply Filters")}
+        </button>
+        <button
+          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700"
+          type="button"
+          onClick={() => {
+            setSearch("");
+            setStatus("");
+            router.replace("/modules/documents" as Route);
+            setRefreshKey((current) => current + 1);
+          }}
+        >
+          {t(lang, "Reset Filters")}
         </button>
       </div>
 
@@ -235,18 +290,18 @@ export function DocumentsDesk() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Student</th>
-              <th>Document</th>
-              <th>Status</th>
-              <th>Remarks</th>
-              <th>Actions</th>
+              <th>{t(lang, "Student")}</th>
+              <th>{t(lang, "Document")}</th>
+              <th>{t(lang, "Status")}</th>
+              <th>{t(lang, "Remarks")}</th>
+              <th>{t(lang, "Actions")}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td className="px-3 py-6 text-center text-slate-500" colSpan={5}>
-                  Loading documents...
+                  {t(lang, "Loading documents...")}
                 </td>
               </tr>
             ) : rows.length ? (
@@ -272,16 +327,16 @@ export function DocumentsDesk() {
                   <td>
                     <div className="flex flex-wrap gap-2">
                       <button className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800" onClick={() => void updateStatus(row, "VERIFIED")} type="button">
-                        Verify
+                        {t(lang, "Verify")}
                       </button>
                       <button className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-800" onClick={() => void updateStatus(row, "REJECTED")} type="button">
-                        Reject
+                        {t(lang, "Reject")}
                       </button>
                       <button className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800" onClick={() => void updateStatus(row, "INCOMPLETE")} type="button">
-                        Incomplete
+                        {t(lang, "Incomplete")}
                       </button>
                       <button className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700" onClick={() => void updateStatus(row, "PENDING")} type="button">
-                        Pending
+                        {t(lang, "Pending")}
                       </button>
                     </div>
                   </td>
@@ -290,7 +345,7 @@ export function DocumentsDesk() {
             ) : (
               <tr>
                 <td className="px-3 py-6 text-center text-slate-500" colSpan={5}>
-                  No document rows found for current filters.
+                  {t(lang, "No document rows found for current filters.")}
                 </td>
               </tr>
             )}

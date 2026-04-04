@@ -2,74 +2,30 @@ import { ScholarshipStatus, VerificationStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { assertUserActionAccess } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
+import { type CsvRow, parseCsv, pickCsvField } from "@/lib/csv-import-utils";
 import { prisma } from "@/lib/prisma";
-
-type CsvRow = Record<string, string>;
-
-function parseCsv(text: string) {
-  const rows: string[][] = [];
-  let current = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-
-    if (char === '"') {
-      if (inQuotes && next === '"') {
-        current += '"';
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (char === "," && !inQuotes) {
-      row.push(current.trim());
-      current = "";
-      continue;
-    }
-
-    if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(current.trim());
-      if (row.some((item) => item.length)) rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  row.push(current.trim());
-  if (row.some((item) => item.length)) rows.push(row);
-
-  if (!rows.length) return [];
-
-  const headers = rows[0].map((item) => item.trim());
-  return rows.slice(1).map((items) => {
-    const output: CsvRow = {};
-    headers.forEach((header, headerIndex) => {
-      output[header] = items[headerIndex]?.trim() || "";
-    });
-    return output;
-  });
-}
+import { normalizeSessionLabel } from "@/lib/session-config";
 
 function pickValue(row: CsvRow, keys: string[]) {
-  for (const key of keys) {
-    const found = row[key];
-    if (typeof found === "string" && found.trim()) return found.trim();
-  }
-  return "";
+  return pickCsvField(row, keys);
 }
 
 function parseDate(value: string) {
   if (!value.trim()) return null;
-  const parsed = new Date(value);
+  const trimmed = value.trim();
+  const dmy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
+    const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const ymd = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (ymd) {
+    const [, yyyy, mm, dd] = ymd;
+    const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const parsed = new Date(trimmed);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
@@ -98,7 +54,8 @@ export async function POST(request: Request) {
 
     const formData = await request.formData();
     const file = formData.get("file");
-    const session = String(formData.get("session") || "").trim();
+    const sessionRaw = String(formData.get("session") || "").trim();
+    const session = normalizeSessionLabel(sessionRaw) || sessionRaw;
     const yearLabel = String(formData.get("yearLabel") || "").trim() || "1st";
 
     if (!(file instanceof File) || file.size === 0) {
@@ -138,18 +95,32 @@ export async function POST(request: Request) {
     for (const row of rows) {
       const fullName = pickValue(row, ["fullName", "name", "studentName"]);
       const instituteCode = pickValue(row, ["instituteCode", "institute", "itiCode"]).toUpperCase();
-      const tradeName = pickValue(row, ["tradeName", "trade"]);
+      const tradeRaw = pickValue(row, ["tradeCode", "tradeName", "trade"]);
 
-      if (!fullName || !instituteCode || !tradeName) {
-        skipped.push(fullName || "Unnamed row");
+      if (!fullName || !instituteCode || !tradeRaw) {
+        skipped.push(
+          !fullName
+            ? "Row: missing student name"
+            : !instituteCode
+              ? `${fullName}: missing institute code`
+              : `${fullName}: missing trade (use trade name or tradeCode column)`
+        );
         continue;
       }
 
       const institute = instituteMap.get(instituteCode);
-      const trade = institute?.trades.find((item) => item.name.toUpperCase() === tradeName.toUpperCase());
+      const trade = institute?.trades.find(
+        (item) =>
+          item.tradeCode.toUpperCase() === tradeRaw.toUpperCase() ||
+          item.name.toUpperCase() === tradeRaw.toUpperCase()
+      );
 
-      if (!institute || !trade) {
-        skipped.push(fullName);
+      if (!institute) {
+        skipped.push(`${fullName}: institute not found (${instituteCode})`);
+        continue;
+      }
+      if (!trade) {
+        skipped.push(`${fullName}: trade not found (${tradeRaw}) for ${instituteCode}`);
         continue;
       }
 

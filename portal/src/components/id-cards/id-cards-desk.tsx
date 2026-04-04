@@ -29,9 +29,9 @@ export async function IdCardsDesk({
       where: query
         ? {
             OR: [
-              { fullName: { contains: query, mode: "insensitive" } },
-              { employeeCode: { contains: query, mode: "insensitive" } },
-              { mobile: { contains: query, mode: "insensitive" } }
+              { fullName: { startsWith: query, mode: "insensitive" } },
+              { employeeCode: { startsWith: query, mode: "insensitive" } },
+              { mobile: { startsWith: query, mode: "insensitive" } }
             ]
           }
         : {},

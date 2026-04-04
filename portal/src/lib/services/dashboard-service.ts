@@ -1,4 +1,10 @@
-import { EnquiryStatus, ScholarshipStatus, VerificationStatus } from "@prisma/client";
+import {
+  DocumentTypeCode,
+  EnquiryStatus,
+  ScholarshipStatus,
+  StudentLifecycleStage,
+  VerificationStatus
+} from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { formatInr } from "@/lib/currency";
@@ -68,6 +74,67 @@ function setCache<T>(store: Map<string, CacheEntry<T>>, key: string, data: T) {
   });
 }
 
+/**
+ * Dashboard cards filter by "active" session variants. Bulk CSV imports often use a session
+ * string that does not match those variants, which made every count 0. When ALL_ACTIVE is selected
+ * and no student matches the strict list but students exist, widen to all distinct session values.
+ */
+async function resolveDashboardSessionsForFilter(params: {
+  selectedSession?: string | null;
+  sessionConfig: { activeOneYearSession: string; activeTwoYearSession: string };
+}): Promise<string[]> {
+  const activeSessions = [
+    params.sessionConfig.activeOneYearSession,
+    params.sessionConfig.activeTwoYearSession
+  ].filter(Boolean);
+  const sessionBase =
+    params.selectedSession && params.selectedSession !== "ALL_ACTIVE"
+      ? [params.selectedSession]
+      : activeSessions;
+
+  let dashboardSessions = Array.from(
+    new Set(sessionBase.flatMap((item) => buildSessionVariants(item)))
+  ).filter(Boolean);
+
+  const allActiveMode = !params.selectedSession || params.selectedSession === "ALL_ACTIVE";
+
+  async function widenFromAllStudents(): Promise<string[]> {
+    const rows = await prisma.student.findMany({
+      where: { deletedAt: null },
+      distinct: ["session"],
+      select: { session: true }
+    });
+    const widen = new Set<string>();
+    for (const r of rows) {
+      buildSessionVariants(r.session).forEach((v) => {
+        if (v) widen.add(v);
+      });
+    }
+    return Array.from(widen).filter(Boolean);
+  }
+
+  if (!dashboardSessions.length) {
+    const total = await prisma.student.count({ where: { deletedAt: null } });
+    if (total > 0) return widenFromAllStudents();
+    return [];
+  }
+
+  if (!allActiveMode) {
+    return dashboardSessions;
+  }
+
+  const totalAny = await prisma.student.count({ where: { deletedAt: null } });
+  const strictCount = await prisma.student.count({
+    where: { deletedAt: null, session: { in: dashboardSessions } }
+  });
+
+  if (totalAny > 0 && strictCount === 0) {
+    return widenFromAllStudents();
+  }
+
+  return dashboardSessions;
+}
+
 async function fetchDashboardMetrics(selectedSession?: string | null): Promise<DashboardMetric[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -78,10 +145,10 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
   if (cached) return cached;
 
   const sessionConfig = await readSessionConfig();
-  const activeSessions = [sessionConfig.activeOneYearSession, sessionConfig.activeTwoYearSession];
-  const sessionBase =
-    selectedSession && selectedSession !== "ALL_ACTIVE" ? [selectedSession] : activeSessions;
-  const dashboardSessions = Array.from(new Set(sessionBase.flatMap((item) => buildSessionVariants(item))));
+  const dashboardSessions = await resolveDashboardSessionsForFilter({
+    selectedSession,
+    sessionConfig
+  });
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
   const todayDateOnly = new Date();
@@ -91,6 +158,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     totalStudents,
     pendingAdmissions,
     docsPending,
+    photoUploadQueue,
     eligibilityPending,
     feeDueCases,
     todayEnquiries,
@@ -104,6 +172,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
   ] = await Promise.all([
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         }
@@ -111,6 +180,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -121,6 +191,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -131,6 +202,23 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
+        session: { in: dashboardSessions },
+        lifecycleStage: { in: [StudentLifecycleStage.ACTIVE, StudentLifecycleStage.PROMOTED] },
+        documentsStatus: { not: VerificationStatus.VERIFIED },
+        NOT: {
+          documents: {
+            some: {
+              deletedAt: null,
+              documentType: DocumentTypeCode.STUDENT_PHOTO
+            }
+          }
+        }
+      }
+    }),
+    prisma.student.count({
+      where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -143,6 +231,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
           gt: 0
         },
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -185,6 +274,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     prisma.scholarshipRecord.count({
       where: {
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -194,6 +284,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -205,6 +296,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -221,6 +313,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
           lte: endOfToday
         },
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -246,6 +339,7 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     }),
     prisma.student.findMany({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         }
@@ -331,6 +425,11 @@ async function fetchDashboardMetrics(selectedSession?: string | null): Promise<D
     { label: "Total Students", value: String(totalStudents), helper: "All admissions in dashboard session view" },
     { label: "Pending Admissions", value: String(pendingAdmissions), helper: "Not fully completed" },
     { label: "Docs Pending", value: String(docsPending), helper: "Requires document review" },
+    {
+      label: "Photo Upload Queue",
+      value: String(photoUploadQueue),
+      helper: "Active students missing photo while documents not verified"
+    },
     { label: "10th Check Pending", value: String(eligibilityPending), helper: "Eligibility not verified" },
     { label: "Fee Due Cases", value: String(feeDueCases), helper: "Outstanding balance exists" },
     { label: "New Enquiries", value: String(newEnquiries), helper: "Captured today in enquiry desk" },
@@ -353,8 +452,10 @@ async function fetchSidebarQueueBadges(): Promise<DashboardMetric[]> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const sessionConfig = await readSessionConfig();
-  const activeSessions = [sessionConfig.activeOneYearSession, sessionConfig.activeTwoYearSession];
-  const dashboardSessions = Array.from(new Set(activeSessions.flatMap((item) => buildSessionVariants(item))));
+  const dashboardSessions = await resolveDashboardSessionsForFilter({
+    selectedSession: "ALL_ACTIVE",
+    sessionConfig
+  });
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
   const todayDateOnly = new Date();
@@ -374,17 +475,20 @@ async function fetchSidebarQueueBadges(): Promise<DashboardMetric[]> {
   ] = await Promise.all([
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: { in: dashboardSessions }
       }
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: { in: dashboardSessions },
         status: { in: ["DRAFT", "IN_PROGRESS", "UNDER_REVIEW"] }
       }
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: { in: dashboardSessions },
         documentsStatus: { in: [VerificationStatus.PENDING, VerificationStatus.INCOMPLETE] }
       }
@@ -392,7 +496,7 @@ async function fetchSidebarQueueBadges(): Promise<DashboardMetric[]> {
     prisma.feeProfile.count({
       where: {
         dueAmount: { gt: 0 },
-        student: { session: { in: dashboardSessions } }
+        student: { deletedAt: null, session: { in: dashboardSessions } }
       }
     }),
     prisma.enquiry.findMany({
@@ -419,24 +523,26 @@ async function fetchSidebarQueueBadges(): Promise<DashboardMetric[]> {
     }),
     prisma.scholarshipRecord.count({
       where: {
-        student: { session: { in: dashboardSessions } },
+        student: { deletedAt: null, session: { in: dashboardSessions } },
         status: ScholarshipStatus.QUERY_BY_DEPARTMENT
       }
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: { in: dashboardSessions },
         OR: [{ prnScvtRecord: { is: null } }, { prnScvtRecord: { is: { prnNumber: null } } }]
       }
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: { in: dashboardSessions },
         OR: [{ prnScvtRecord: { is: null } }, { prnScvtRecord: { is: { scvtRegistrationNumber: null } } }]
       }
     }),
     prisma.student.findMany({
-      where: { session: { in: dashboardSessions } },
+      where: { deletedAt: null, session: { in: dashboardSessions } },
       distinct: ["instituteId", "tradeId"],
       select: {
         tradeId: true,
@@ -504,10 +610,10 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
   if (cached) return cached;
 
   const sessionConfig = await readSessionConfig();
-  const activeSessions = [sessionConfig.activeOneYearSession, sessionConfig.activeTwoYearSession];
-  const sessionBase =
-    selectedSession && selectedSession !== "ALL_ACTIVE" ? [selectedSession] : activeSessions;
-  const dashboardSessions = Array.from(new Set(sessionBase.flatMap((item) => buildSessionVariants(item))));
+  const dashboardSessions = await resolveDashboardSessionsForFilter({
+    selectedSession,
+    sessionConfig
+  });
 
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
@@ -545,6 +651,7 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
     }),
     prisma.student.count({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -566,6 +673,7 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
       where: {
         placementStatus: "JOINED",
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -590,6 +698,7 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
           lte: monthEnd
         },
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -613,6 +722,7 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
     }),
     prisma.student.findMany({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         },
@@ -639,6 +749,7 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
     }),
     prisma.student.findMany({
       where: {
+        deletedAt: null,
         session: {
           in: dashboardSessions
         }
@@ -669,7 +780,7 @@ async function fetchDashboardInsights(selectedSession?: string | null): Promise<
     Promise.all(
       dashboardSessions.map(async (session) => {
         const agg = await prisma.feeTransaction.aggregate({
-          where: { student: { session } },
+          where: { student: { session, deletedAt: null } },
           _sum: { amountPaid: true }
         });
         return { session, total: toSafeNumber(agg._sum.amountPaid) };
@@ -969,10 +1080,10 @@ export const getDashboardInsights = cache(async (selectedSession?: string | null
 
 export async function getDashboardDiagnostics(selectedSession?: string | null) {
   const sessionConfig = await readSessionConfig();
-  const activeSessions = [sessionConfig.activeOneYearSession, sessionConfig.activeTwoYearSession];
-  const sessionBase =
-    selectedSession && selectedSession !== "ALL_ACTIVE" ? [selectedSession] : activeSessions;
-  const dashboardSessions = Array.from(new Set(sessionBase.flatMap((item) => buildSessionVariants(item))));
+  const dashboardSessions = await resolveDashboardSessionsForFilter({
+    selectedSession,
+    sessionConfig
+  });
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -996,7 +1107,7 @@ export async function getDashboardDiagnostics(selectedSession?: string | null) {
     monthlyFeeTransactionsScoped
   ] = await Promise.all([
     prisma.student.findMany({
-      where: { session: { in: dashboardSessions } },
+      where: { deletedAt: null, session: { in: dashboardSessions } },
       select: {
         id: true,
         tradeId: true,
@@ -1061,6 +1172,7 @@ export async function getDashboardDiagnostics(selectedSession?: string | null) {
           lte: endOfToday
         },
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -1084,6 +1196,7 @@ export async function getDashboardDiagnostics(selectedSession?: string | null) {
           lte: monthEnd
         },
         student: {
+          deletedAt: null,
           session: {
             in: dashboardSessions
           }
@@ -1153,6 +1266,8 @@ export async function getDashboardDiagnostics(selectedSession?: string | null) {
       "Total Students": "sessionStudentScope.students",
       "Pending Admissions": "getDashboardMetrics -> student.count(status in DRAFT/IN_PROGRESS/UNDER_REVIEW)",
       "Docs Pending": "getDashboardMetrics -> student.count(documentsStatus in PENDING/INCOMPLETE)",
+      "Photo Upload Queue":
+        "getDashboardMetrics -> active/promoted students, documents not verified, no STUDENT_PHOTO row",
       "10th Check Pending": "getDashboardMetrics -> student.count(eligibilityStatus=PENDING)",
       "Fee Due Cases": "getDashboardMetrics -> feeProfile.count(dueAmount > 0, student.session scoped)",
       "New Enquiries": "enquiries.today.scoped",

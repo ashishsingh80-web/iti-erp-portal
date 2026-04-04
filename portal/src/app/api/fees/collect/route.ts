@@ -105,6 +105,7 @@ export async function POST(request: Request) {
       },
       select: {
         id: true,
+        agentId: true,
         feeProfile: {
           select: {
             dueAmount: true
@@ -119,6 +120,16 @@ export async function POST(request: Request) {
     const overPayment = normalizedItems.find((item) => item.amountPaid > (dueByStudent.get(item.studentId) || 0) + 0.001);
     if (overPayment) {
       return NextResponse.json({ ok: false, message: "Entered amount is greater than current due for one or more students" }, { status: 400 });
+    }
+
+    if (payerType === FeePayerType.AGENT && agent) {
+      const invalidAgentMappedStudents = studentFeeRows.filter((row) => row.agentId !== agent.id);
+      if (invalidAgentMappedStudents.length) {
+        return NextResponse.json(
+          { ok: false, message: "One or more selected students are not mapped to the selected agent" },
+          { status: 400 }
+        );
+      }
     }
 
     const receipts = await prisma.$transaction(async (tx) => {

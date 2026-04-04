@@ -1,8 +1,10 @@
+import { HINDI_EXTRA_TRANSLATIONS } from "@/lib/i18n-hi-extra";
+
 export type AppLanguage = "en" | "hi";
 
 export const APP_LANGUAGE_COOKIE = "portal_lang";
 
-const textMap: Record<string, string> = {
+const textMapBase: Record<string, string> = {
   "Institute Operations Portal": "संस्थान संचालन पोर्टल",
   "Skilled manpower operations portal": "कुशल जनशक्ति संचालन पोर्टल",
   Dashboard: "डैशबोर्ड",
@@ -307,6 +309,12 @@ const textMap: Record<string, string> = {
   "Payment not saved": "भुगतान सहेजा नहीं गया",
   "Salary record saved": "वेतन रिकॉर्ड सहेजा गया",
   "payment recorded successfully.": "का भुगतान सफलतापूर्वक दर्ज किया गया।"
+};
+
+/** Base strings plus module/navigation Hindi; extra map wins on duplicate keys. */
+const textMap: Record<string, string> = {
+  ...textMapBase,
+  ...HINDI_EXTRA_TRANSLATIONS
 };
 
 export function resolveAppLanguage(value?: string | null): AppLanguage {

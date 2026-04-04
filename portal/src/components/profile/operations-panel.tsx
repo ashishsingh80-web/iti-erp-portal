@@ -8,6 +8,8 @@ import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { t } from "@/lib/i18n";
 import { useAppLanguage } from "@/lib/use-app-language";
 
+export type OperationsPanelPartialMode = "fees-exam" | "scholarship" | "scvt" | "prn" | "undertaking";
+
 type OperationsPanelProps = {
   studentId: string;
   currentUserRole: string;
@@ -16,6 +18,8 @@ type OperationsPanelProps = {
   initialPrnScvt: StudentProfileData["prnScvt"];
   initialExamStatus: StudentProfileData["examStatus"];
   initialUndertaking: StudentProfileData["undertaking"];
+  /** When set, only the matching desk block(s) render (for student profile tabs). */
+  partialMode?: OperationsPanelPartialMode;
 };
 
 type MessageState = {
@@ -64,9 +68,29 @@ export function OperationsPanel({
   initialScholarship,
   initialPrnScvt,
   initialExamStatus,
-  initialUndertaking
+  initialUndertaking,
+  partialMode
 }: OperationsPanelProps) {
   const lang = useAppLanguage();
+  const isFull = partialMode === undefined;
+  const showFees = isFull || partialMode === "fees-exam";
+  const showExam = isFull || partialMode === "fees-exam";
+  const showScholarship = isFull || partialMode === "scholarship";
+  const showScvt = isFull || partialMode === "scvt";
+  const showPrn = isFull || partialMode === "prn";
+  const showUndertaking = isFull || partialMode === "undertaking";
+  const partialTitle =
+    partialMode === "fees-exam"
+      ? t(lang, "Fees & exams")
+      : partialMode === "scholarship"
+        ? t(lang, "Scholarship")
+        : partialMode === "scvt"
+          ? t(lang, "SCVT")
+          : partialMode === "prn"
+            ? t(lang, "PRN")
+            : partialMode === "undertaking"
+              ? t(lang, "Undertaking")
+              : "";
   const [fees, setFees] = useState(initialFees);
   const [scholarship, setScholarship] = useState(initialScholarship);
   const [prnScvt, setPrnScvt] = useState(initialPrnScvt);
@@ -433,15 +457,23 @@ export function OperationsPanel({
 
   return (
     <section className="surface p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Operations Desk")}</p>
-          <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "Fees, Scholarship, Exams, PRN & Undertaking")}</h3>
-          <p className="mt-2 text-sm text-slate-600">{t(lang, "Use this desk to move the student through finance, scholarship, exam, registration, and undertaking steps.")}</p>
+      {isFull ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Operations Desk")}</p>
+            <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "Fees, Scholarship, Exams, PRN & Undertaking")}</h3>
+            <p className="mt-2 text-sm text-slate-600">{t(lang, "Use this desk to move the student through finance, scholarship, exam, registration, and undertaking steps.")}</p>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Student desk")}</p>
+          <h3 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-slate-950">{partialTitle}</h3>
+        </div>
+      )}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+      <div className={`mt-6 grid gap-6 ${isFull || partialMode === "fees-exam" ? "xl:grid-cols-2" : ""}`}>
+        {showFees ? (
         <div className="rounded-3xl border border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-semibold text-slate-900">{t(lang, "Fees")}</h4>
@@ -527,7 +559,9 @@ export function OperationsPanel({
           </div>
           </div>
         </div>
+        ) : null}
 
+        {showScholarship ? (
         <div className="rounded-3xl border border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-semibold text-slate-900">Scholarship</h4>
@@ -567,7 +601,9 @@ export function OperationsPanel({
           </button>
           </div>
         </div>
+        ) : null}
 
+        {showExam ? (
         <div className="rounded-3xl border border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-semibold text-slate-900">Exam Status</h4>
@@ -649,7 +685,9 @@ export function OperationsPanel({
             </button>
           </div>
         </div>
+        ) : null}
 
+        {showScvt ? (
         <div className="rounded-3xl border border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-semibold text-slate-900">SCVT</h4>
@@ -686,7 +724,9 @@ export function OperationsPanel({
           </button>
           </div>
         </div>
+        ) : null}
 
+        {showPrn ? (
         <div className="rounded-3xl border border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-semibold text-slate-900">PRN</h4>
@@ -730,7 +770,9 @@ export function OperationsPanel({
             </button>
           </div>
         </div>
+        ) : null}
 
+        {showUndertaking ? (
         <div className="rounded-3xl border border-slate-100 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h4 className="font-semibold text-slate-900">Undertaking</h4>
@@ -818,6 +860,7 @@ export function OperationsPanel({
           </button>
           </div>
         </div>
+        ) : null}
       </div>
     </section>
   );

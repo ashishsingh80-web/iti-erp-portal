@@ -8,16 +8,18 @@ import type { AuthUser } from "@/lib/auth";
 import { getUserAllowedModules } from "@/lib/access";
 import type { AppLanguage } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
-import { portalModules, portalNavigationGroups } from "@/lib/module-config";
+import { portalModules, portalNavigationGroups, SIDEBAR_HIDDEN_MODULE_SLUGS } from "@/lib/module-config";
+
+const hiddenFromSidebar = new Set<string>(SIDEBAR_HIDDEN_MODULE_SLUGS);
 
 const roleDefaultPins: Record<AuthUser["role"], string[]> = {
   SUPER_ADMIN: ["management", "reports", "settings", "accounts", "admissions", "students"],
   ADMIN: ["management", "reports", "settings", "accounts", "admissions", "students"],
-  ADMISSION_STAFF: ["admissions", "enquiry", "students", "attendance", "documents", "reports"],
-  DOCUMENT_VERIFIER: ["documents", "students", "undertaking", "certificates", "reports", "no-dues"],
-  SCHOLARSHIP_DESK: ["scholarship", "students", "documents", "reports", "communication", "management"],
+  ADMISSION_STAFF: ["admissions", "enquiry", "students", "attendance", "reports"],
+  DOCUMENT_VERIFIER: ["students", "certificates", "reports", "no-dues"],
+  SCHOLARSHIP_DESK: ["students", "reports", "communication", "management"],
   FINANCE_DESK: ["fees", "accounts", "students", "agents", "hr", "management"],
-  PRN_SCVT_DESK: ["scvt", "prn", "students", "exam-status", "reports", "management"],
+  PRN_SCVT_DESK: ["students", "exam-status", "reports", "management"],
   VIEWER: ["dashboard", "students", "reports", "management", "attendance", "certificates"]
 };
 
@@ -35,6 +37,7 @@ export function Sidebar({
   const pathname = usePathname();
   const [search, setSearch] = useState("");
   const [pinnedSlugs, setPinnedSlugs] = useState<string[]>([]);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const modules = getUserAllowedModules(user, portalModules);
   const liveModuleBySlug = useMemo(() => new Map(modules.map((module) => [module.slug, module])), [modules]);
   const normalizedSearch = search.trim().toLowerCase();
@@ -44,6 +47,7 @@ export function Sidebar({
         .map((group) => ({
           ...group,
           modules: group.slugs
+            .filter((slug) => !hiddenFromSidebar.has(slug))
             .map((slug) => liveModuleBySlug.get(slug))
             .filter((module): module is (typeof modules)[number] => Boolean(module))
             .filter((module) => {
@@ -60,13 +64,12 @@ export function Sidebar({
     string,
     {
       badge: string;
-      open?: boolean;
     }
   > = {
-    Dashboard: { badge: "DB", open: true },
-    "Admission Management": { badge: "AM", open: true },
-    "Student Management": { badge: "SM", open: true },
-    "Agent Management": { badge: "AG", open: true },
+    Dashboard: { badge: "DB" },
+    "Admission Management": { badge: "AM" },
+    "Student Management": { badge: "SM" },
+    "Agent Management": { badge: "AG" },
     "Scholarship Management": { badge: "SC" },
     "Fees Management": { badge: "FE" },
     "Attendance Management": { badge: "AT" },
@@ -77,7 +80,7 @@ export function Sidebar({
     "Inventory / Store Management": { badge: "IS" },
     Accounting: { badge: "FN" },
     "Communication Module": { badge: "CM" },
-    "Reports & Analytics": { badge: "RA", open: true },
+    "Reports & Analytics": { badge: "RA" },
     "Master Setup": { badge: "MS" },
     "Legal & Compliance": { badge: "LC" }
   };
@@ -140,7 +143,14 @@ export function Sidebar({
       : pathname.startsWith("/modules/")
         ? pathname.replace("/modules/", "").split("/")[0]
         : "";
+
+  // Keep navigation compact: only the active group is open by default.
+  // Other groups open/close strictly based on user clicks.
+  useEffect(() => {
+    setOpenGroups({});
+  }, [currentSlug]);
   const pinnedModules = pinnedSlugs
+    .filter((slug) => !hiddenFromSidebar.has(slug))
     .map((slug) => liveModuleBySlug.get(slug))
     .filter((module): module is (typeof modules)[number] => Boolean(module));
 
@@ -151,7 +161,9 @@ export function Sidebar({
 
   useEffect(() => {
     const storageKey = `iti-erp-sidebar-pins:${user.id}`;
-    const defaultPins = (roleDefaultPins[user.role] || []).filter((slug) => liveModuleBySlug.has(slug)).slice(0, 6);
+    const defaultPins = (roleDefaultPins[user.role] || [])
+      .filter((slug) => liveModuleBySlug.has(slug) && !hiddenFromSidebar.has(slug))
+      .slice(0, 6);
     try {
       const saved = window.localStorage.getItem(storageKey);
       let nextPins = defaultPins;
@@ -161,7 +173,7 @@ export function Sidebar({
       }
       const parsed = JSON.parse(saved) as string[];
       if (Array.isArray(parsed)) {
-        const filtered = parsed.filter((slug) => liveModuleBySlug.has(slug)).slice(0, 6);
+        const filtered = parsed.filter((slug) => liveModuleBySlug.has(slug) && !hiddenFromSidebar.has(slug)).slice(0, 6);
         nextPins = filtered.length ? filtered : defaultPins;
       }
       setPinnedSlugs((current) => (samePins(current, nextPins) ? current : nextPins));
@@ -204,8 +216,10 @@ export function Sidebar({
               width={150}
             />
           </div>
-          <h1 className="mt-0 text-xl font-semibold leading-7 text-white">Adarsh Rashtriya Private ITI &amp; Babu Harbansh Bahadur Singh Private ITI</h1>
-          <p className="mt-1 max-w-[220px] text-sm leading-6 text-white/65">{t(lang, "Skilled manpower operations portal")}</p>
+          <h1 className="mt-1 max-w-[250px] text-base font-semibold leading-6 text-white">
+            Adarsh Rashtriya Private ITI
+            <span className="block text-white/80">&amp; Babu Harbansh Bahadur Singh Private ITI</span>
+          </h1>
         </div>
       </div>
 
@@ -321,7 +335,11 @@ export function Sidebar({
             <details
               key={`${group.key}-${group.title}`}
               className="rounded-[1.5rem] border border-white/8 bg-white/[0.03] p-2"
-              open={groupIsActive || meta.open}
+              open={openGroups[group.title] === true}
+              onToggle={(event) => {
+                const nextOpen = event.currentTarget.open;
+                setOpenGroups((cur) => ({ ...cur, [group.title]: nextOpen }));
+              }}
             >
               <summary
                 className={`flex cursor-pointer list-none items-center justify-between rounded-2xl px-3 py-2 text-sm font-semibold transition hover:bg-white/6 ${

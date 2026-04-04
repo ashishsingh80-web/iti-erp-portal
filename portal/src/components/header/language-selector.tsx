@@ -6,8 +6,15 @@ import type { AppLanguage } from "@/lib/i18n";
 export function LanguageSelector({ currentLanguage }: { currentLanguage: AppLanguage }) {
   const router = useRouter();
 
-  function updateLanguage(nextLanguage: string) {
-    document.cookie = `portal_lang=${nextLanguage}; path=/; max-age=31536000; samesite=lax`;
+  async function updateLanguage(nextLanguage: string) {
+    const response = await fetch("/api/settings/language", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: nextLanguage })
+    });
+    if (!response.ok) {
+      return;
+    }
     document.documentElement.lang = nextLanguage === "hi" ? "hi" : "en";
     window.dispatchEvent(new Event("portal-language-change"));
     router.refresh();

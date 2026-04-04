@@ -1,14 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 import { showToast } from "@/lib/toast";
+import { useAppLanguage } from "@/lib/use-app-language";
 
 type AdmissionStatusActionsProps = {
   studentId: string;
   currentStatus: string | null;
 };
 
+const markTitles: Record<"CANCELED" | "DROPPED" | "TRANSFERRED", string> = {
+  CANCELED: "Mark as canceled",
+  DROPPED: "Mark as dropped",
+  TRANSFERRED: "Mark as transferred"
+};
+
 export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionStatusActionsProps) {
+  const lang = useAppLanguage();
   const [loading, setLoading] = useState(false);
   const [openAction, setOpenAction] = useState<"CANCELED" | "DROPPED" | "TRANSFERRED" | null>(null);
   const [note, setNote] = useState("");
@@ -19,8 +28,8 @@ export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionSt
     if (!trimmedNote) {
       showToast({
         kind: "error",
-        title: "Note required",
-        message: "Please enter a reason note before confirming"
+        title: t(lang, "Note required"),
+        message: t(lang, "Please enter a reason note before confirming")
       });
       return;
     }
@@ -39,13 +48,19 @@ export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionSt
       });
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result?.message || "Unable to update admission status");
+        throw new Error(result?.message || t(lang, "Unable to update admission status"));
       }
+
+      const code = result.student?.studentCode || "";
+      const statusWord = t(lang, action);
+      const message = code
+        ? `${code} ${t(lang, "marked as")} ${statusWord}`
+        : `${t(lang, "marked as")} ${statusWord}`;
 
       showToast({
         kind: "success",
-        title: "Admission status updated",
-        message: `${result.student?.studentCode || ""} marked as ${action.replaceAll("_", " ")}`
+        title: t(lang, "Admission status updated"),
+        message
       });
       setOpenAction(null);
       setNote("");
@@ -53,8 +68,8 @@ export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionSt
     } catch (error) {
       showToast({
         kind: "error",
-        title: "Admission status not updated",
-        message: error instanceof Error ? error.message : "Unable to update admission status"
+        title: t(lang, "Admission status not updated"),
+        message: error instanceof Error ? error.message : t(lang, "Unable to update admission status")
       });
     } finally {
       setLoading(false);
@@ -68,35 +83,35 @@ export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionSt
           setOpenAction("CANCELED");
           setNote("");
         }} type="button">
-          Cancel
+          {t(lang, "Cancel admission")}
         </button>
         <button className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} onClick={() => {
           setOpenAction("DROPPED");
           setNote("");
         }} type="button">
-          Drop Out
+          {t(lang, "Drop out")}
         </button>
         <button className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 disabled:cursor-not-allowed disabled:opacity-50" disabled={disabled} onClick={() => {
           setOpenAction("TRANSFERRED");
-          setNote("Transferred to another institute / trade");
+          setNote(t(lang, "Transferred to another institute / trade"));
         }} type="button">
-          Transfer
+          {t(lang, "Transfer")}
         </button>
       </div>
       {openAction ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4">
           <div className="w-full max-w-lg rounded-[2rem] border border-slate-200 bg-white p-6 shadow-2xl">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Admission Status</p>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">{t(lang, "Admission Status")}</p>
             <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-slate-900">
-              Mark as {openAction.replaceAll("_", " ")}
+              {t(lang, markTitles[openAction])}
             </h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Add a clear reason note for this status update.
+              {t(lang, "Add a clear reason note for this status update.")}
             </p>
             <textarea
               className="mt-4 min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900"
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Enter reason note"
+              placeholder={t(lang, "Enter reason note")}
               value={note}
             />
             <div className="mt-6 flex flex-wrap justify-end gap-3">
@@ -106,7 +121,7 @@ export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionSt
                 onClick={() => setOpenAction(null)}
                 type="button"
               >
-                Cancel
+                {t(lang, "Cancel")}
               </button>
               <button
                 className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -114,7 +129,7 @@ export function AdmissionStatusActions({ studentId, currentStatus }: AdmissionSt
                 onClick={() => void runAction(openAction)}
                 type="button"
               >
-                {loading ? "Saving..." : "Confirm Update"}
+                {loading ? t(lang, "Saving...") : t(lang, "Confirm Update")}
               </button>
             </div>
           </div>

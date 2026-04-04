@@ -13,9 +13,9 @@ export async function listInventoryDeskData(search = "", department = "") {
     ...(search.trim()
       ? {
           OR: [
-            { itemCode: { contains: search.trim(), mode: "insensitive" } },
-            { itemName: { contains: search.trim(), mode: "insensitive" } },
-            { storageLocation: { contains: search.trim(), mode: "insensitive" } }
+            { itemCode: { startsWith: search.trim(), mode: "insensitive" } },
+            { itemName: { startsWith: search.trim(), mode: "insensitive" } },
+            { storageLocation: { startsWith: search.trim(), mode: "insensitive" } }
           ]
         }
       : {})
@@ -26,9 +26,9 @@ export async function listInventoryDeskData(search = "", department = "") {
     ...(search.trim()
       ? {
           OR: [
-            { fullName: { contains: search.trim(), mode: "insensitive" } },
-            { studentCode: { contains: search.trim(), mode: "insensitive" } },
-            { mobile: { contains: search.trim() } }
+            { fullName: { startsWith: search.trim(), mode: "insensitive" } },
+            { studentCode: { startsWith: search.trim(), mode: "insensitive" } },
+            { mobile: { startsWith: search.trim() } }
           ]
         }
       : {})
@@ -55,10 +55,10 @@ export async function listInventoryDeskData(search = "", department = "") {
         ...(search.trim()
           ? {
               OR: [
-                { student: { fullName: { contains: search.trim(), mode: "insensitive" } } },
-                { student: { studentCode: { contains: search.trim(), mode: "insensitive" } } },
-                { item: { itemCode: { contains: search.trim(), mode: "insensitive" } } },
-                { item: { itemName: { contains: search.trim(), mode: "insensitive" } } }
+                { student: { fullName: { startsWith: search.trim(), mode: "insensitive" } } },
+                { student: { studentCode: { startsWith: search.trim(), mode: "insensitive" } } },
+                { item: { itemCode: { startsWith: search.trim(), mode: "insensitive" } } },
+                { item: { itemName: { startsWith: search.trim(), mode: "insensitive" } } }
               ]
             }
           : {})

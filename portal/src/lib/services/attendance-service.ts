@@ -16,9 +16,9 @@ export async function listAttendanceRows(scope: AttendanceScope, recordDate: str
         ...(searchText
           ? {
               OR: [
-                { fullName: { contains: searchText, mode: "insensitive" } },
-                { employeeCode: { contains: searchText, mode: "insensitive" } },
-                { mobile: { contains: searchText, mode: "insensitive" } }
+                { fullName: { startsWith: searchText, mode: "insensitive" } },
+                { employeeCode: { startsWith: searchText, mode: "insensitive" } },
+                { mobile: { startsWith: searchText, mode: "insensitive" } }
               ]
             }
           : {})
@@ -60,9 +60,9 @@ export async function listAttendanceRows(scope: AttendanceScope, recordDate: str
       ...(searchText
         ? {
             OR: [
-              { fullName: { contains: searchText, mode: "insensitive" } },
-              { studentCode: { contains: searchText, mode: "insensitive" } },
-              { mobile: { contains: searchText, mode: "insensitive" } }
+              { fullName: { startsWith: searchText, mode: "insensitive" } },
+              { studentCode: { startsWith: searchText, mode: "insensitive" } },
+              { mobile: { startsWith: searchText, mode: "insensitive" } }
             ]
           }
         : {})

@@ -44,10 +44,10 @@ export async function listEnquiries(filters: EnquiryListFilters = {}) {
   if (filters.search?.trim()) {
     const search = filters.search.trim();
     where.OR = [
-      { fullName: { contains: search, mode: "insensitive" } },
-      { mobile: { contains: search } },
-      { parentMobile: { contains: search } },
-      { assignedCounsellor: { contains: search, mode: "insensitive" } }
+      { fullName: { startsWith: search, mode: "insensitive" } },
+      { mobile: { startsWith: search } },
+      { parentMobile: { startsWith: search } },
+      { assignedCounsellor: { startsWith: search, mode: "insensitive" } }
     ];
   }
 

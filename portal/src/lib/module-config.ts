@@ -13,6 +13,11 @@ export type PortalNavigationGroup = {
   slugs: string[];
 };
 
+/** Shown in module page + access matrix, but not listed in the sidebar (use student profile tabs + queues). */
+export const SIDEBAR_HIDDEN_MODULE_SLUGS = ["documents", "undertaking", "scholarship", "scvt", "prn"] as const;
+
+export type SidebarHiddenModuleSlug = (typeof SIDEBAR_HIDDEN_MODULE_SLUGS)[number];
+
 export const portalModules: PortalModule[] = [
   {
     slug: "dashboard",
@@ -26,8 +31,8 @@ export const portalModules: PortalModule[] = [
     slug: "admissions",
     title: "Admissions",
     shortTitle: "Admissions",
-    description: "Student onboarding, seat control, eligibility, photo, and qualification capture.",
-    highlights: ["Seat units", "Eligibility", "Uploads"],
+    description: "Overview KPIs, admission register, new admission form, and bulk CSV — split by tabs to keep each step short.",
+    highlights: ["Overview", "Register", "New form"],
     group: "operations"
   },
   {
@@ -40,10 +45,10 @@ export const portalModules: PortalModule[] = [
   },
   {
     slug: "students",
-    title: "Student Directory",
+    title: "Students",
     shortTitle: "Students",
-    description: "Searchable student directory with profile, workflow, and action history.",
-    highlights: ["Search", "Profile", "Queue"],
+    description: "Directory, verification, and import tabs; open a student for documents, undertaking, SCVT, PRN, scholarship, and fees/exam in one place.",
+    highlights: ["Directory", "Verification", "Student tabs"],
     group: "operations"
   },
   {
@@ -186,8 +191,8 @@ export const portalModules: PortalModule[] = [
     slug: "fees",
     title: "Fees",
     shortTitle: "Fees",
-    description: "Student fees, agent collections, installment tracking, and due control.",
-    highlights: ["Collections", "Due", "Agent ledger"],
+    description: "Fee collection desk, agent ledger, and agent outstanding — each on its own tab.",
+    highlights: ["Collection", "Ledger", "Outstanding"],
     group: "finance"
   },
   {
@@ -269,7 +274,7 @@ export const portalNavigationGroups: PortalNavigationGroup[] = [
   {
     key: "operations",
     title: "Admission Management",
-    slugs: ["admissions", "enquiry", "documents", "undertaking", "id-cards"]
+    slugs: ["admissions", "enquiry", "id-cards"]
   },
   {
     key: "operations",
@@ -277,7 +282,6 @@ export const portalNavigationGroups: PortalNavigationGroup[] = [
     slugs: ["students", "promote", "alumni", "student-archive", "no-dues"]
   },
   { key: "administration", title: "Agent Management", slugs: ["agents"] },
-  { key: "compliance", title: "Scholarship Management", slugs: ["scholarship"] },
   { key: "finance", title: "Fees Management", slugs: ["fees"] },
   { key: "operations", title: "Attendance Management", slugs: ["attendance"] },
   {
@@ -288,7 +292,7 @@ export const portalNavigationGroups: PortalNavigationGroup[] = [
   {
     key: "compliance",
     title: "Examination Management",
-    slugs: ["exam-status", "scvt", "prn"]
+    slugs: ["exam-status"]
   },
   { key: "compliance", title: "Certificate & Document Management", slugs: ["certificates"] },
   { key: "administration", title: "Employee / HR Management", slugs: ["hr"] },

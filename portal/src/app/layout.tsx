@@ -10,6 +10,7 @@ import { readAppLanguage } from "@/lib/i18n-server";
 import { getSidebarQueueBadges } from "@/lib/services/dashboard-service";
 import { readSessionConfig } from "@/lib/session-config";
 import "./globals.css";
+import { AppLanguageProvider } from "@/components/providers/app-language-provider";
 import { CsrfFetchWrapper } from "@/components/security/csrf-fetch-wrapper";
 import { AppSerwistProvider } from "@/components/serwist-provider";
 
@@ -61,28 +62,30 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body suppressHydrationWarning className={`${inter.variable} ${space.variable} font-sans`}>
         <AppSerwistProvider>
           <CsrfFetchWrapper />
-        {user ? (
-          <>
-            <div className="mx-auto grid min-h-screen max-w-[1700px] items-start gap-6 px-4 py-6 print:block print:max-w-none print:px-0 print:py-0 md:grid-cols-[320px_minmax(0,1fr)] md:px-6">
-              <div className="hidden min-h-0 md:-my-6 md:block md:self-start">
-                <Sidebar badges={sidebarBadges} className="md:top-0 md:h-[100dvh] md:max-h-[100dvh]" lang={lang} user={user} />
-              </div>
-              <main className="space-y-6 overflow-visible print:space-y-0">
-                <div className="md:hidden">
-                  <SidebarDrawer badges={sidebarBadges} lang={lang} user={user} />
+          <AppLanguageProvider initialLang={lang}>
+            {user ? (
+              <>
+                <div className="mx-auto grid min-h-screen max-w-[1700px] items-start gap-6 px-4 py-6 print:block print:max-w-none print:px-0 print:py-0 md:grid-cols-[320px_minmax(0,1fr)] md:px-6">
+                  <div className="hidden min-h-0 md:block md:self-start">
+                    <Sidebar badges={sidebarBadges} className="md:top-0 md:h-[100dvh] md:max-h-[100dvh]" lang={lang} user={user} />
+                  </div>
+                  <main className="space-y-6 overflow-visible print:space-y-0">
+                    <div className="md:hidden">
+                      <SidebarDrawer badges={sidebarBadges} lang={lang} user={user} />
+                    </div>
+                    {sessionConfig ? <AppHeader lang={lang} sessionConfig={sessionConfig} user={user} /> : null}
+                    {children}
+                  </main>
                 </div>
-                {sessionConfig ? <AppHeader lang={lang} sessionConfig={sessionConfig} user={user} /> : null}
+                <ToastHost />
+              </>
+            ) : (
+              <>
                 {children}
-              </main>
-            </div>
-            <ToastHost />
-          </>
-        ) : (
-          <>
-            {children}
-            <ToastHost />
-          </>
-        )}
+                <ToastHost />
+              </>
+            )}
+          </AppLanguageProvider>
         </AppSerwistProvider>
       </body>
     </html>

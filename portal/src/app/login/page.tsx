@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
+import { LanguageSelector } from "@/components/header/language-selector";
 import { getCurrentUser } from "@/lib/auth";
+import { t } from "@/lib/i18n";
+import { readAppLanguage } from "@/lib/i18n-server";
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
@@ -10,23 +13,28 @@ export default async function LoginPage() {
     redirect("/");
   }
 
+  const lang = await readAppLanguage();
+
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10">
       <div className="grid w-full gap-8 lg:grid-cols-[1.2fr_0.8fr]">
         <section className="surface rounded-[2rem] bg-gradient-to-br from-slate-950 via-emerald-900 to-orange-500 p-8 text-white">
-          <p className="text-xs uppercase tracking-[0.35em] text-white/75">BHB International School · School ERP</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-white/75">{t(lang, "BHB International School · School ERP")}</p>
           <h1 className="mt-3 max-w-3xl font-serif text-5xl font-semibold tracking-tight">
-            Role-based staff portal for admissions, fees, academics, communication, and operations.
+            {t(lang, "Role-based staff portal for admissions, fees, academics, communication, and operations.")}
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-6 text-white/85">
-            Each desk signs in with its own access. Modules match your role (admission, finance, documents, and more).
+            {t(lang, "Each desk signs in with its own access. Modules match your role (admission, finance, documents, and more).")}
           </p>
         </section>
 
         <section className="surface p-8">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Sign In</p>
-          <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight">School ERP · Staff login</h2>
-          <p className="mt-2 text-sm text-slate-600">Use your desk credentials to continue.</p>
+          <div className="mb-4 flex justify-end">
+            <LanguageSelector currentLanguage={lang} />
+          </div>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Sign In")}</p>
+          <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "School ERP · Staff login")}</h2>
+          <p className="mt-2 text-sm text-slate-600">{t(lang, "Use your desk credentials to continue.")}</p>
           <div className="mt-6">
             <LoginForm />
           </div>
@@ -36,7 +44,7 @@ export default async function LoginPage() {
                 Local demo (run <code className="rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-slate-800">npm run prisma:seed</code> first)
               </p>
               <p className="mt-2 font-mono text-[11px] leading-relaxed text-slate-800">
-                <span className="text-slate-500">Email</span> admin@bhb.local <span className="text-slate-400">or</span> admin@itierp.local
+                <span className="text-slate-500">Email</span> admin@bhb.local <span className="text-slate-400">or</span> ashishsingh80@gmail.com
                 <span className="mx-2 text-slate-400">·</span>
                 <span className="text-slate-500">Password</span> Admin@123
               </p>
@@ -47,17 +55,17 @@ export default async function LoginPage() {
             </div>
           ) : null}
           <div className="mt-6 text-sm text-slate-600">
-            Student portal:
+            {t(lang, "Student portal:")}
             {" "}
             <Link className="font-semibold text-emerald-800 underline-offset-4 hover:underline" href="/student-login">
-              Open student login
+              {t(lang, "Open student login")}
             </Link>
           </div>
           <div className="mt-2 text-sm text-slate-600">
-            Parent portal:
+            {t(lang, "Parent portal:")}
             {" "}
             <Link className="font-semibold text-emerald-800 underline-offset-4 hover:underline" href="/parent-login">
-              Open parent login
+              {t(lang, "Open parent login")}
             </Link>
           </div>
         </section>

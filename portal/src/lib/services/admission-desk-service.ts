@@ -22,6 +22,8 @@ export type AdmissionDeskFilters = {
   assignment?: string;
   unitNumber?: string;
   view?: string;
+  /** UI section: overview | register | form | import */
+  section?: string;
 };
 
 export type AdmissionDeskData = {

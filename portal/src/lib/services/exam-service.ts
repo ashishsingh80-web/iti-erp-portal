@@ -27,9 +27,9 @@ export async function listExamDeskRows(search = "") {
       ...(search.trim()
         ? {
             OR: [
-              { fullName: { contains: search.trim(), mode: "insensitive" } },
-              { studentCode: { contains: search.trim(), mode: "insensitive" } },
-              { mobile: { contains: search.trim() } }
+              { fullName: { startsWith: search.trim(), mode: "insensitive" } },
+              { studentCode: { startsWith: search.trim(), mode: "insensitive" } },
+              { mobile: { startsWith: search.trim() } }
             ]
           }
         : {})
@@ -143,9 +143,9 @@ export async function listHallTicketIssueRows(search = "") {
         ? {
             student: {
               OR: [
-                { fullName: { contains: search.trim(), mode: "insensitive" } },
-                { studentCode: { contains: search.trim(), mode: "insensitive" } },
-                { mobile: { contains: search.trim() } }
+                { fullName: { startsWith: search.trim(), mode: "insensitive" } },
+                { studentCode: { startsWith: search.trim(), mode: "insensitive" } },
+                { mobile: { startsWith: search.trim() } }
               ]
             }
           }

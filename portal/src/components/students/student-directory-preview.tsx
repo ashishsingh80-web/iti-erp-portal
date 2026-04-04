@@ -5,11 +5,57 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatInr } from "@/lib/currency";
 import { formatEnumLabel } from "@/lib/display";
-import { t } from "@/lib/i18n";
+import { type AppLanguage, t } from "@/lib/i18n";
 import type { StudentDirectoryRow } from "@/lib/types";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { useAppLanguage } from "@/lib/use-app-language";
+
+const STUDENT_FILTER_PARAM_KEYS: Record<string, string> = {
+  status: "Status",
+  documentsStatus: "Documents status",
+  eligibilityStatus: "Eligibility status",
+  paymentStatus: "Payment status",
+  scholarshipStatus: "Scholarship status",
+  missingPrn: "Missing PRN",
+  missingScvt: "Missing SCVT",
+  scvtVerificationStatus: "SCVT verification status",
+  undertakingGenerationStatus: "Undertaking generation",
+  undertakingSignedStatus: "Undertaking signed"
+};
+
+function studentFilterParamLabel(lang: AppLanguage, key: string) {
+  const phrase = STUDENT_FILTER_PARAM_KEYS[key];
+  return phrase ? t(lang, phrase) : key;
+}
+
+function withStudentsDirectoryTab(params: URLSearchParams) {
+  const next = new URLSearchParams(params.toString());
+  next.set("tab", "directory");
+  return next;
+}
+
+function studentFilterValueDisplay(lang: AppLanguage, key: string, value: string) {
+  if ((key === "missingPrn" || key === "missingScvt") && value === "1") {
+    return t(lang, "Yes");
+  }
+  if (
+    [
+      "status",
+      "documentsStatus",
+      "eligibilityStatus",
+      "paymentStatus",
+      "scholarshipStatus",
+      "scvtVerificationStatus",
+      "undertakingGenerationStatus",
+      "undertakingSignedStatus"
+    ].includes(key)
+  ) {
+    const pretty = formatEnumLabel(value);
+    return t(lang, pretty);
+  }
+  return value;
+}
 
 export function StudentDirectoryPreview() {
   const lang = useAppLanguage();
@@ -26,7 +72,7 @@ export function StudentDirectoryPreview() {
   const page = Math.max(Number(searchParams.get("page") || "1"), 1);
   const pageSize = Math.max(Number(searchParams.get("pageSize") || "25"), 1);
 
-  const totalLabel = useMemo(() => `${total} records`, [total]);
+  const totalLabel = useMemo(() => `${total} ${t(lang, "records")}`, [total, lang]);
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
   const pagedRows = rows;
   const activeFilters = useMemo(
@@ -48,18 +94,19 @@ export function StudentDirectoryPreview() {
     [searchParams]
   );
   const queuePresets = [
-    { label: "Fees Due", href: "/modules/students?paymentStatus=UNPAID" },
-    { label: "Docs Pending", href: "/modules/students?documentsStatus=PENDING" },
-    { label: "Scholarship Query", href: "/modules/students?scholarshipStatus=QUERY_BY_DEPARTMENT" },
-    { label: "PRN Missing", href: "/modules/students?missingPrn=1" },
-    { label: "SCVT Missing", href: "/modules/students?missingScvt=1" },
-    { label: "Undertaking Pending", href: "/modules/students?undertakingGenerationStatus=PENDING" }
+    { label: t(lang, "Fees Due"), href: "/modules/fees?tab=collect" },
+    { label: t(lang, "Docs Pending"), href: "/modules/students?tab=verification&queue=docs" },
+    { label: t(lang, "Photo upload queue"), href: "/modules/students?tab=verification&queue=upload" },
+    { label: t(lang, "Scholarship Query"), href: "/modules/scholarship?status=QUERY_BY_DEPARTMENT" },
+    { label: t(lang, "PRN Missing"), href: "/modules/students?tab=directory&missingPrn=1" },
+    { label: t(lang, "SCVT Missing"), href: "/modules/scvt" },
+    { label: t(lang, "Undertaking Pending"), href: "/modules/students?tab=directory&undertakingGenerationStatus=PENDING" }
   ];
   const allPageSelected = pagedRows.length > 0 && pagedRows.every((row) => selectedIds.includes(row.id));
   const selectedRows = rows.filter((row) => selectedIds.includes(row.id));
 
   function updateSort(nextSortBy: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = withStudentsDirectoryTab(new URLSearchParams(searchParams.toString()));
     const nextDir = sortBy === nextSortBy && sortDir === "asc" ? "desc" : "asc";
     params.set("sortBy", nextSortBy);
     params.set("sortDir", nextDir);
@@ -68,20 +115,20 @@ export function StudentDirectoryPreview() {
   }
 
   function updatePage(nextPage: number) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = withStudentsDirectoryTab(new URLSearchParams(searchParams.toString()));
     params.set("page", String(nextPage));
     router.replace(`/modules/students?${params.toString()}`);
   }
 
   function updatePageSize(nextPageSize: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = withStudentsDirectoryTab(new URLSearchParams(searchParams.toString()));
     params.set("pageSize", nextPageSize);
     params.set("page", "1");
     router.replace(`/modules/students?${params.toString()}`);
   }
 
   function buildExportHref(scope: "full" | "current" = "full") {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = withStudentsDirectoryTab(new URLSearchParams(searchParams.toString()));
     params.set("format", "csv");
     params.set("sortBy", sortBy);
     params.set("sortDir", sortDir);
@@ -92,6 +139,7 @@ export function StudentDirectoryPreview() {
     } else {
       params.delete("exportScope");
     }
+    params.delete("tab");
     return `/api/students?${params.toString()}`;
   }
 
@@ -123,7 +171,18 @@ export function StudentDirectoryPreview() {
   function exportSelectedCsv() {
     if (!selectedRows.length) return;
 
-    const headers = ["Student Code", "Name", "Institute", "Trade", "Session", "Year", "Status", "Documents", "Eligibility", "Due"];
+    const headers = [
+      t(lang, "Student Code"),
+      t(lang, "Name"),
+      t(lang, "Institute"),
+      t(lang, "Trade"),
+      t(lang, "Session"),
+      t(lang, "Year"),
+      t(lang, "Status"),
+      t(lang, "Documents"),
+      t(lang, "Eligibility"),
+      t(lang, "Due")
+    ];
     const escapeCsv = (value: string) =>
       value.includes(",") || value.includes("\"") || value.includes("\n")
         ? `"${value.replace(/"/g, "\"\"")}"`
@@ -163,7 +222,7 @@ export function StudentDirectoryPreview() {
     setError("");
 
     try {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = withStudentsDirectoryTab(new URLSearchParams(searchParams.toString()));
       if (nextSearch.trim()) params.set("search", nextSearch.trim());
       else params.delete("search");
 
@@ -171,18 +230,20 @@ export function StudentDirectoryPreview() {
         router.replace(`/modules/students?${params.toString()}`);
       }
 
-      const response = await fetch(`/api/students?${params.toString()}`);
+      const apiParams = new URLSearchParams(params.toString());
+      apiParams.delete("tab");
+      const response = await fetch(`/api/students?${apiParams.toString()}`);
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result?.message || "Failed to load students");
+        setError(result?.message || t(lang, "Failed to load students"));
         return;
       }
 
       setRows(result.rows || []);
       setTotal(Number(result.total || 0));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Failed to load students");
+      setError(loadError instanceof Error ? loadError.message : t(lang, "Failed to load students"));
     } finally {
       setLoading(false);
     }
@@ -219,21 +280,21 @@ export function StudentDirectoryPreview() {
           value={search}
         />
         <button
-          className="rounded-2xl bg-emerald-800 px-4 py-3 text-sm font-semibold text-white"
+          className="btn-primary"
           onClick={() => loadStudents()}
           type="button"
         >
-          {loading ? t(lang, "Loading...") : t(lang, "Apply Search")}
+          {loading ? t(lang, "Loading...") : t(lang, "Apply Filters")}
         </button>
         <button
-          className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700"
+          className="btn-secondary"
           onClick={() => {
             setSearch("");
-            router.replace("/modules/students");
+            router.replace("/modules/students?tab=directory");
           }}
           type="button"
         >
-          {t(lang, "Reset")}
+          {t(lang, "Reset Filters")}
         </button>
       </div>
 
@@ -241,7 +302,7 @@ export function StudentDirectoryPreview() {
         <div className="flex flex-wrap gap-2 border-b border-slate-100 px-6 py-4">
           {activeFilters.map((item) => (
             <span key={item.key} className="rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-              {item.key}: {item.value}
+              {studentFilterParamLabel(lang, item.key)}: {studentFilterValueDisplay(lang, item.key, item.value)}
             </span>
           ))}
         </div>
@@ -253,7 +314,7 @@ export function StudentDirectoryPreview() {
 
       <div className="border-b border-slate-100 px-6 py-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Saved Queues</span>
+          <span className="mr-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{t(lang, "Saved Queues")}</span>
           {queuePresets.map((preset) => {
             const presetQuery = preset.href.split("?")[1] || "";
             const isActive =
@@ -282,16 +343,18 @@ export function StudentDirectoryPreview() {
 
       {selectedIds.length ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50 px-6 py-4 text-sm">
-          <p className="font-semibold text-emerald-800">{selectedIds.length} students selected</p>
+          <p className="font-semibold text-emerald-800">
+            {selectedIds.length} {t(lang, "students selected")}
+          </p>
           <div className="flex flex-wrap gap-2">
-            <button className="rounded-xl bg-emerald-800 px-4 py-2 text-sm font-semibold text-white" onClick={exportSelectedCsv} type="button">
-              Export Selected CSV
+            <button className="btn-primary" onClick={exportSelectedCsv} type="button">
+              {t(lang, "Export Selected CSV")}
             </button>
-            <button className="rounded-xl border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-800" onClick={openSelectedProfiles} type="button">
-              Open Selected Profiles
+            <button className="btn-secondary" onClick={openSelectedProfiles} type="button">
+              {t(lang, "Open Selected Profiles")}
             </button>
-            <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" onClick={clearSelection} type="button">
-              Clear Selection
+            <button className="btn-secondary" onClick={clearSelection} type="button">
+              {t(lang, "Clear Selection")}
             </button>
           </div>
         </div>
@@ -299,22 +362,22 @@ export function StudentDirectoryPreview() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4 text-sm">
         <p className="text-slate-600">
-          Showing {(total && (page - 1) * pageSize + 1) || 0}-
-          {Math.min((page - 1) * pageSize + rows.length, total)} of {total}
+          {t(lang, "Showing")} {(total && (page - 1) * pageSize + 1) || 0}-
+          {Math.min((page - 1) * pageSize + rows.length, total)} {t(lang, "of")} {total}
         </p>
         <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
-          <label className="text-slate-600">Rows</label>
+          <label className="text-slate-600">{t(lang, "Rows")}</label>
           <select className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm" onChange={(event) => updatePageSize(event.target.value)} value={String(pageSize)}>
             <option value="10">10</option>
             <option value="25">25</option>
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-          <a className="rounded-xl bg-emerald-800 px-4 py-2 text-sm font-semibold text-white" href={buildExportHref("full")}>
-            Download Full CSV
+          <a className="btn-primary" href={buildExportHref("full")}>
+            {t(lang, "Download Full CSV")}
           </a>
-          <a className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700" href={buildExportHref("current")}>
-            Current Page CSV
+          <a className="btn-secondary" href={buildExportHref("current")}>
+            {t(lang, "Current Page CSV")}
           </a>
         </div>
       </div>
@@ -325,20 +388,20 @@ export function StudentDirectoryPreview() {
             <tr>
               <th className="px-5 py-3 font-medium">
                 <button className="inline-flex items-center gap-2 hover:text-slate-800" onClick={toggleCurrentPage} type="button">
-                  <span>{allPageSelected ? "Clear" : "Select"}</span>
+                  <span>{allPageSelected ? t(lang, "Clear") : t(lang, "Select")}</span>
                 </button>
               </th>
               {[
-                ["Student Code", "studentCode"],
-                ["Name", "fullName"],
-                ["Unit", "unitNumber"],
-                ["Institute", "instituteName"],
-                ["Trade", "tradeName"],
-                ["Session", "session"],
-                ["Status", "status"],
-                ["Docs", "documentsStatus"],
-                ["Eligibility", "eligibilityStatus"],
-                ["Due", "dueAmount"]
+                [t(lang, "Student Code"), "studentCode"],
+                [t(lang, "Name"), "fullName"],
+                [t(lang, "Unit"), "unitNumber"],
+                [t(lang, "Institute"), "instituteName"],
+                [t(lang, "Trade"), "tradeName"],
+                [t(lang, "Session"), "session"],
+                [t(lang, "Status"), "status"],
+                [t(lang, "Docs"), "documentsStatus"],
+                [t(lang, "Eligibility"), "eligibilityStatus"],
+                [t(lang, "Due"), "dueAmount"]
               ].map(([header, key]) => (
                 <th key={header} className="px-5 py-3 font-medium">
                   <button className="inline-flex items-center gap-2 hover:text-slate-800" onClick={() => updateSort(key)} type="button">
@@ -386,7 +449,7 @@ export function StudentDirectoryPreview() {
             )) : (
               <tr className="border-t border-slate-100">
                 <td className="px-5 py-8 text-center text-slate-500" colSpan={11}>
-                  {loading ? "Loading students..." : "No students found"}
+                  {loading ? t(lang, "Loading students...") : t(lang, "No students found")}
                 </td>
               </tr>
             )}
@@ -395,13 +458,15 @@ export function StudentDirectoryPreview() {
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4">
-        <p className="text-sm text-slate-600">Page {page} of {totalPages}</p>
+        <p className="text-sm text-slate-600">
+          {t(lang, "Page")} {page} {t(lang, "of")} {totalPages}
+        </p>
         <div className="flex gap-2">
           <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50" disabled={page <= 1} onClick={() => updatePage(page - 1)} type="button">
-            Previous
+            {t(lang, "Previous")}
           </button>
           <button className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50" disabled={page >= totalPages} onClick={() => updatePage(page + 1)} type="button">
-            Next
+            {t(lang, "Next")}
           </button>
         </div>
       </div>

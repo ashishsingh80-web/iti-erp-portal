@@ -55,7 +55,7 @@ export const blueprintSidebarSections: BlueprintSidebarSection[] = [
     key: "finance",
     title: "Finance & Operations",
     items: [
-      { label: "Fees", slug: "fees", href: "/modules/fees", status: "live" },
+      { label: "Fees", slug: "fees", href: "/modules/fees?tab=collect", status: "live" },
       { label: "Accounts", slug: "accounts", href: "/modules/accounts", status: "partial" },
       { label: "Attendance", slug: "attendance", href: "/modules/attendance", status: "live" },
       { label: "Agents", slug: "agents", href: "/modules/agents", status: "live" }

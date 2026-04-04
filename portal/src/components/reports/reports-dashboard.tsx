@@ -2,9 +2,96 @@ import Link from "next/link";
 import { instituteOptions, sessionOptions, tradeOptions, yearOptions } from "@/lib/constants";
 import { ReportActions } from "@/components/reports/report-actions";
 import { formatInr, looksLikeMoneyField } from "@/lib/currency";
+import { formatEnumLabel } from "@/lib/display";
 import { t } from "@/lib/i18n";
 import { readAppLanguage } from "@/lib/i18n-server";
 import { getReportData, getReportSummaries, paginateReportRows, sortReportRows, type ReportKey } from "@/lib/services/report-service";
+
+const REPORT_CATALOG: Array<{ key: string; label: string }> = [
+  { key: "fees-due", label: "Fees Due" },
+  { key: "fees-aging-agent-session", label: "Fees Aging (Agent/Session)" },
+  { key: "fees-accounts-consistency", label: "Fees-Accounts Consistency" },
+  { key: "finance-cashflow-mode", label: "Cashflow by Payment Mode" },
+  { key: "finance-fee-collection-trend", label: "Fee Collection Trend" },
+  { key: "finance-agent-collection-vs-posting", label: "Agent Collection vs Posting" },
+  { key: "document-pending", label: "Document Pending" },
+  { key: "prn-scvt-pending", label: "PRN / SCVT Pending" },
+  { key: "finance-summary", label: "Finance Summary" },
+  { key: "purchase-register", label: "Purchase Register" },
+  { key: "vendor-due", label: "Vendor Due" },
+  { key: "admissions-summary", label: "Admissions Summary" },
+  { key: "scholarship-status", label: "Scholarship Status" },
+  { key: "agent-statement", label: "Agent Statement" },
+  { key: "attendance-daily", label: "Attendance Daily" },
+  { key: "inventory-stock", label: "Inventory Stock" },
+  { key: "library-issues", label: "Library Open Issues" },
+  { key: "hr-payments", label: "HR Payments" },
+  { key: "communication-log", label: "Communication Logs" },
+  { key: "grievance-cases", label: "Grievance Cases" },
+  { key: "placement-status", label: "Placement Status" },
+  { key: "timetable-plan", label: "Timetable Plan" },
+  { key: "enquiry-follow-up", label: "Enquiry Follow-up" },
+  { key: "institute-comparison", label: "Institute Comparison" },
+  { key: "trade-demand", label: "Trade Demand" },
+  { key: "session-finance", label: "Session Finance" }
+];
+
+const REPORT_PRESET_GROUPS: Array<{
+  id: string;
+  label: string;
+  items: Array<{ label: string; href: string }>;
+}> = [
+  {
+    id: "daily",
+    label: "Daily Operations",
+    items: [
+      { label: "Admissions Queue", href: "/modules/reports?report=admissions-summary" },
+      { label: "Enquiry Follow-up", href: "/modules/reports?report=enquiry-follow-up" },
+      { label: "Attendance Daily", href: "/modules/reports?report=attendance-daily" },
+      { label: "Communication Logs", href: "/modules/reports?report=communication-log" },
+      { label: "Grievance Cases", href: "/modules/reports?report=grievance-cases" }
+    ]
+  },
+  {
+    id: "compliance",
+    label: "Compliance & Registration",
+    items: [
+      { label: "Docs Pending", href: "/modules/reports?report=document-pending" },
+      { label: "Verification workbench", href: "/modules/students?tab=verification&queue=pending_any" },
+      { label: "Scholarship Query", href: "/modules/reports?report=scholarship-status&scholarshipStatus=QUERY_BY_DEPARTMENT" },
+      { label: "PRN / SCVT Pending", href: "/modules/reports?report=prn-scvt-pending" },
+      { label: "Timetable Plan", href: "/modules/reports?report=timetable-plan" }
+    ]
+  },
+  {
+    id: "finance",
+    label: "Finance & Accounts",
+    items: [
+      { label: "Fees Due", href: "/modules/reports?report=fees-due" },
+      { label: "Fees Aging", href: "/modules/reports?report=fees-aging-agent-session" },
+      { label: "Fees-Accounts Consistency", href: "/modules/reports?report=fees-accounts-consistency" },
+      { label: "Cashflow by Payment Mode", href: "/modules/reports?report=finance-cashflow-mode" },
+      { label: "Fee Collection Trend", href: "/modules/reports?report=finance-fee-collection-trend" },
+      { label: "Agent Collection vs Posting", href: "/modules/reports?report=finance-agent-collection-vs-posting" },
+      { label: "Finance Summary", href: "/modules/reports?report=finance-summary" },
+      { label: "Vendor Due", href: "/modules/reports?report=vendor-due" },
+      { label: "Agent Statement", href: "/modules/reports?report=agent-statement" },
+      { label: "HR Payments", href: "/modules/reports?report=hr-payments" }
+    ]
+  },
+  {
+    id: "resources",
+    label: "Resources & Outcomes",
+    items: [
+      { label: "Inventory Stock", href: "/modules/reports?report=inventory-stock" },
+      { label: "Library Open Issues", href: "/modules/reports?report=library-issues" },
+      { label: "Placement Status", href: "/modules/reports?report=placement-status" },
+      { label: "Institute Comparison", href: "/modules/reports?report=institute-comparison" },
+      { label: "Trade Demand", href: "/modules/reports?report=trade-demand" },
+      { label: "Session Finance", href: "/modules/reports?report=session-finance" }
+    ]
+  }
+];
 
 export async function ReportsDashboard({
   filters
@@ -73,98 +160,39 @@ export async function ReportsDashboard({
   const sharedQuery = new URLSearchParams(
     Object.entries(activeFilters).filter(([, value]) => value)
   ).toString();
+
+  function reportCatalogLabel(reportKey: string) {
+    const row = REPORT_CATALOG.find((item) => item.key === reportKey);
+    return row ? t(lang, row.label) : reportKey;
+  }
+
+  function filterChipEnumValue(raw: string) {
+    const pretty = formatEnumLabel(raw);
+    return t(lang, pretty);
+  }
+
   const activeFilterChips = [
-    filters.report ? `Report: ${filters.report}` : "",
-    filters.search ? `Search: ${filters.search}` : "",
-    filters.instituteCode ? `Institute: ${filters.instituteCode}` : "",
-    filters.session ? `Session: ${filters.session}` : "",
-    filters.yearLabel ? `Year: ${filters.yearLabel}` : "",
-    filters.tradeValue ? `Trade: ${filters.tradeValue}` : "",
-    filters.admissionMode ? `Admission Mode: ${filters.admissionMode}` : "",
-    filters.paymentMode ? `Payment Mode: ${filters.paymentMode}` : "",
-    filters.studentStatus ? `Admission Status: ${filters.studentStatus}` : "",
-    filters.documentStatus ? `Document Status: ${filters.documentStatus}` : "",
-    filters.paymentStatus ? `Payment Status: ${filters.paymentStatus}` : "",
-    filters.scholarshipStatus ? `Scholarship Status: ${filters.scholarshipStatus}` : "",
-    filters.enquiryStatus ? `Enquiry Status: ${filters.enquiryStatus}` : "",
-    filters.dateFrom ? `From: ${filters.dateFrom}` : "",
-    filters.dateTo ? `To: ${filters.dateTo}` : ""
+    filters.report ? `${t(lang, "Report")}: ${reportCatalogLabel(filters.report)}` : "",
+    filters.search ? `${t(lang, "Search")}: ${filters.search}` : "",
+    filters.instituteCode ? `${t(lang, "Institute")}: ${filters.instituteCode}` : "",
+    filters.session ? `${t(lang, "Session")}: ${filters.session}` : "",
+    filters.yearLabel ? `${t(lang, "Year")}: ${filters.yearLabel}` : "",
+    filters.tradeValue ? `${t(lang, "Trade")}: ${filters.tradeValue}` : "",
+    filters.admissionMode ? `${t(lang, "Admission Mode")}: ${filterChipEnumValue(filters.admissionMode)}` : "",
+    filters.paymentMode ? `${t(lang, "Payment Mode")}: ${filterChipEnumValue(filters.paymentMode)}` : "",
+    filters.studentStatus ? `${t(lang, "Admission Status")}: ${filterChipEnumValue(filters.studentStatus)}` : "",
+    filters.documentStatus ? `${t(lang, "Document Status")}: ${filterChipEnumValue(filters.documentStatus)}` : "",
+    filters.paymentStatus ? `${t(lang, "Payment Status")}: ${filterChipEnumValue(filters.paymentStatus)}` : "",
+    filters.scholarshipStatus ? `${t(lang, "Scholarship status")}: ${filterChipEnumValue(filters.scholarshipStatus)}` : "",
+    filters.enquiryStatus ? `${t(lang, "Enquiry Status")}: ${filterChipEnumValue(filters.enquiryStatus)}` : "",
+    filters.dateFrom ? `${t(lang, "From")}: ${filters.dateFrom}` : "",
+    filters.dateTo ? `${t(lang, "To")}: ${filters.dateTo}` : ""
   ].filter(Boolean);
-  const quickExports = [
-    { key: "fees-due", label: "Fees Due" },
-    { key: "fees-aging-agent-session", label: "Fees Aging (Agent/Session)" },
-    { key: "fees-accounts-consistency", label: "Fees-Accounts Consistency" },
-    { key: "finance-cashflow-mode", label: "Cashflow by Payment Mode" },
-    { key: "finance-fee-collection-trend", label: "Fee Collection Trend" },
-    { key: "finance-agent-collection-vs-posting", label: "Agent Collection vs Posting" },
-    { key: "document-pending", label: "Document Pending" },
-    { key: "prn-scvt-pending", label: "PRN / SCVT Pending" },
-    { key: "finance-summary", label: "Finance Summary" },
-    { key: "purchase-register", label: "Purchase Register" },
-    { key: "vendor-due", label: "Vendor Due" },
-    { key: "admissions-summary", label: "Admissions Summary" },
-    { key: "scholarship-status", label: "Scholarship Status" },
-    { key: "agent-statement", label: "Agent Statement" },
-    { key: "attendance-daily", label: "Attendance Daily" },
-    { key: "inventory-stock", label: "Inventory Stock" },
-    { key: "library-issues", label: "Library Open Issues" },
-    { key: "hr-payments", label: "HR Payments" },
-    { key: "communication-log", label: "Communication Logs" },
-    { key: "grievance-cases", label: "Grievance Cases" },
-    { key: "placement-status", label: "Placement Status" },
-    { key: "timetable-plan", label: "Timetable Plan" },
-    { key: "enquiry-follow-up", label: "Enquiry Follow-up" },
-    { key: "institute-comparison", label: "Institute Comparison" },
-    { key: "trade-demand", label: "Trade Demand" },
-    { key: "session-finance", label: "Session Finance" }
-  ];
-  const reportPresetGroups = [
-    {
-      label: "Daily Operations",
-      items: [
-        { label: "Admissions Queue", href: "/modules/reports?report=admissions-summary" },
-        { label: "Enquiry Follow-up", href: "/modules/reports?report=enquiry-follow-up" },
-        { label: "Attendance Daily", href: "/modules/reports?report=attendance-daily" },
-        { label: "Communication Logs", href: "/modules/reports?report=communication-log" },
-        { label: "Grievance Cases", href: "/modules/reports?report=grievance-cases" }
-      ]
-    },
-    {
-      label: "Compliance & Registration",
-      items: [
-        { label: "Docs Pending", href: "/modules/reports?report=document-pending" },
-        { label: "Scholarship Query", href: "/modules/reports?report=scholarship-status&scholarshipStatus=QUERY_BY_DEPARTMENT" },
-        { label: "PRN / SCVT Pending", href: "/modules/reports?report=prn-scvt-pending" },
-        { label: "Timetable Plan", href: "/modules/reports?report=timetable-plan" }
-      ]
-    },
-    {
-      label: "Finance & Accounts",
-      items: [
-        { label: "Fees Due", href: "/modules/reports?report=fees-due" },
-        { label: "Fees Aging", href: "/modules/reports?report=fees-aging-agent-session" },
-        { label: "Fees-Accounts Consistency", href: "/modules/reports?report=fees-accounts-consistency" },
-        { label: "Cashflow by Payment Mode", href: "/modules/reports?report=finance-cashflow-mode" },
-        { label: "Fee Collection Trend", href: "/modules/reports?report=finance-fee-collection-trend" },
-        { label: "Agent Collection vs Posting", href: "/modules/reports?report=finance-agent-collection-vs-posting" },
-        { label: "Finance Summary", href: "/modules/reports?report=finance-summary" },
-        { label: "Vendor Due", href: "/modules/reports?report=vendor-due" },
-        { label: "Agent Statement", href: "/modules/reports?report=agent-statement" },
-        { label: "HR Payments", href: "/modules/reports?report=hr-payments" }
-      ]
-    },
-    {
-      label: "Resources & Outcomes",
-      items: [
-        { label: "Inventory Stock", href: "/modules/reports?report=inventory-stock" },
-        { label: "Library Open Issues", href: "/modules/reports?report=library-issues" },
-        { label: "Placement Status", href: "/modules/reports?report=placement-status" },
-        { label: "Institute Comparison", href: "/modules/reports?report=institute-comparison" },
-        { label: "Trade Demand", href: "/modules/reports?report=trade-demand" },
-        { label: "Session Finance", href: "/modules/reports?report=session-finance" }
-      ]
-    }
-  ];
+
+  const quickExports = REPORT_CATALOG.map((item) => ({
+    key: item.key,
+    label: t(lang, item.label)
+  }));
   const totalMatchedRows = previews.reduce((sum, report) => sum + report.rows.length, 0);
   const currentPage = Math.max(Number(activeFilters.page || "1"), 1);
   const pageSize = Math.max(Number(activeFilters.pageSize || "10"), 1);
@@ -215,10 +243,32 @@ export async function ReportsDashboard({
   }
 
   function formatReportCell(header: string, value: string) {
-    if (!looksLikeMoneyField(header)) return value || "-";
-    const numeric = Number(String(value || "").replace(/,/g, ""));
-    if (!Number.isFinite(numeric)) return value || "-";
-    return formatInr(numeric);
+    const raw = String(value ?? "").trim();
+    if (looksLikeMoneyField(header)) {
+      const numeric = Number(raw.replace(/,/g, ""));
+      if (!Number.isFinite(numeric)) return raw || "-";
+      return formatInr(numeric);
+    }
+    if (!raw) return "-";
+    if (raw === "All") return t(lang, "All");
+    if (/^[A-Z][A-Z0-9_]*$/.test(raw)) {
+      return t(lang, formatEnumLabel(raw));
+    }
+    return raw;
+  }
+
+  function translateSummaryHelper(item: { key: string; helper: string }) {
+    if (item.key === "finance-summary" && item.helper.startsWith("Net balance for ")) {
+      const suffix = item.helper.slice("Net balance for ".length);
+      return `${t(lang, "Net balance for")} ${suffix}`;
+    }
+    return t(lang, item.helper);
+  }
+
+  function translateSummaryValue(item: { value: string | number }) {
+    const v = String(item.value ?? "").trim();
+    if (v === "All") return t(lang, "All");
+    return String(item.value ?? "");
   }
 
   function buildQueueHref(studentIds: string[]) {
@@ -239,121 +289,107 @@ export async function ReportsDashboard({
         <form action="/modules/reports" className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.report || ""} name="report">
             <option value="">{t(lang, "All report previews")}</option>
-            <option value="fees-due">Fees Due</option>
-            <option value="fees-aging-agent-session">Fees Aging (Agent/Session)</option>
-            <option value="fees-accounts-consistency">Fees-Accounts Consistency</option>
-            <option value="finance-cashflow-mode">Cashflow by Payment Mode</option>
-            <option value="finance-fee-collection-trend">Fee Collection Trend</option>
-            <option value="finance-agent-collection-vs-posting">Agent Collection vs Posting</option>
-            <option value="document-pending">Document Pending</option>
-            <option value="prn-scvt-pending">PRN / SCVT Pending</option>
-            <option value="finance-summary">Finance Summary</option>
-            <option value="purchase-register">Purchase Register</option>
-            <option value="vendor-due">Vendor Due</option>
-            <option value="admissions-summary">Admissions Summary</option>
-            <option value="scholarship-status">Scholarship Status</option>
-            <option value="agent-statement">Agent Statement</option>
-            <option value="attendance-daily">Attendance Daily</option>
-            <option value="inventory-stock">Inventory Stock</option>
-            <option value="library-issues">Library Open Issues</option>
-            <option value="hr-payments">HR Payments</option>
-            <option value="communication-log">Communication Logs</option>
-            <option value="grievance-cases">Grievance Cases</option>
-            <option value="placement-status">Placement Status</option>
-            <option value="timetable-plan">Timetable Plan</option>
-            <option value="enquiry-follow-up">Enquiry Follow-up</option>
-            <option value="institute-comparison">Institute Comparison</option>
-            <option value="trade-demand">Trade Demand</option>
-            <option value="session-finance">Session Finance</option>
+            {REPORT_CATALOG.map((item) => (
+              <option key={item.key} value={item.key}>
+                {t(lang, item.label)}
+              </option>
+            ))}
           </select>
           <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" defaultValue={filters.search || ""} name="search" placeholder={t(lang, "Student, code, mobile, vendor")} />
           <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.instituteCode || ""} name="instituteCode">
-            <option value="">All institutes</option>
+            <option value="">{t(lang, "All institutes")}</option>
             {instituteOptions.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}
           </select>
           <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.session || ""} name="session">
-            <option value="">All sessions</option>
+            <option value="">{t(lang, "All sessions")}</option>
             {sessionOptions.map((item) => (
               <option key={item.value} value={item.value}>{item.label}</option>
             ))}
           </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.yearLabel || ""} name="yearLabel">
-            <option value="">All years</option>
-            {yearOptions.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.tradeValue || ""} name="tradeValue">
-            <option value="">All trades</option>
-            {tradeOptions.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.admissionMode || ""} name="admissionMode">
-            <option value="">All admission modes</option>
-            <option value="DIRECT">Direct</option>
-            <option value="AGENT">Agent</option>
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.paymentMode || ""} name="paymentMode">
-            <option value="">All payment modes</option>
-            <option value="CASH">Cash</option>
-            <option value="UPI">UPI</option>
-            <option value="ONLINE">Online</option>
-            <option value="BANK_TRANSFER">Bank Transfer</option>
-            <option value="AGENT_COLLECTION">Agent Collection</option>
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.studentStatus || ""} name="studentStatus">
-            <option value="">All admission statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="UNDER_REVIEW">Under Review</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.documentStatus || ""} name="documentStatus">
-            <option value="">All document statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="VERIFIED">Verified</option>
-            <option value="INCOMPLETE">Incomplete</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.paymentStatus || ""} name="paymentStatus">
-            <option value="">All payment statuses</option>
-            <option value="UNPAID">Unpaid</option>
-            <option value="PARTIAL">Partial</option>
-            <option value="PAID">Paid</option>
-            <option value="OVERDUE">Overdue</option>
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.scholarshipStatus || ""} name="scholarshipStatus">
-            <option value="">All scholarship statuses</option>
-            <option value="NOT_APPLIED">Not Applied</option>
-            <option value="APPLIED">Applied</option>
-            <option value="UNDER_PROCESS">Under Process</option>
-            <option value="QUERY_BY_DEPARTMENT">Query by Department</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
-          <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.enquiryStatus || ""} name="enquiryStatus">
-            <option value="">All enquiry statuses</option>
-            <option value="NEW">New</option>
-            <option value="FOLLOW_UP">Follow Up</option>
-            <option value="VISIT_SCHEDULED">Visit Scheduled</option>
-            <option value="COUNSELLED">Counselled</option>
-            <option value="INTERESTED">Interested</option>
-            <option value="DOCUMENTS_PENDING">Documents Pending</option>
-            <option value="CONVERTED">Converted</option>
-            <option value="LOST">Lost</option>
-          </select>
-          <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" defaultValue={filters.dateFrom || ""} name="dateFrom" type="date" />
-          <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" defaultValue={filters.dateTo || ""} name="dateTo" type="date" />
-          <div className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-2">
+          <details className="sm:col-span-2 xl:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">
+              {t(lang, "Advanced Filters")}
+            </summary>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.yearLabel || ""} name="yearLabel">
+                <option value="">{t(lang, "All years")}</option>
+                {yearOptions.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.tradeValue || ""} name="tradeValue">
+                <option value="">{t(lang, "All trades")}</option>
+                {tradeOptions.map((item) => (
+                  <option key={item.value} value={item.value}>{item.label}</option>
+                ))}
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.admissionMode || ""} name="admissionMode">
+                <option value="">{t(lang, "All admission modes")}</option>
+                <option value="DIRECT">{t(lang, formatEnumLabel("DIRECT"))}</option>
+                <option value="AGENT">{t(lang, formatEnumLabel("AGENT"))}</option>
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.paymentMode || ""} name="paymentMode">
+                <option value="">{t(lang, "All payment modes")}</option>
+                <option value="CASH">{t(lang, formatEnumLabel("CASH"))}</option>
+                <option value="UPI">{t(lang, formatEnumLabel("UPI"))}</option>
+                <option value="ONLINE">{t(lang, formatEnumLabel("ONLINE"))}</option>
+                <option value="BANK_TRANSFER">{t(lang, formatEnumLabel("BANK_TRANSFER"))}</option>
+                <option value="AGENT_COLLECTION">{t(lang, formatEnumLabel("AGENT_COLLECTION"))}</option>
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.studentStatus || ""} name="studentStatus">
+                <option value="">{t(lang, "All admission statuses")}</option>
+                <option value="DRAFT">{t(lang, formatEnumLabel("DRAFT"))}</option>
+                <option value="IN_PROGRESS">{t(lang, formatEnumLabel("IN_PROGRESS"))}</option>
+                <option value="UNDER_REVIEW">{t(lang, formatEnumLabel("UNDER_REVIEW"))}</option>
+                <option value="COMPLETED">{t(lang, formatEnumLabel("COMPLETED"))}</option>
+                <option value="REJECTED">{t(lang, formatEnumLabel("REJECTED"))}</option>
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.documentStatus || ""} name="documentStatus">
+                <option value="">{t(lang, "All document statuses")}</option>
+                <option value="PENDING">{t(lang, formatEnumLabel("PENDING"))}</option>
+                <option value="VERIFIED">{t(lang, formatEnumLabel("VERIFIED"))}</option>
+                <option value="INCOMPLETE">{t(lang, formatEnumLabel("INCOMPLETE"))}</option>
+                <option value="REJECTED">{t(lang, formatEnumLabel("REJECTED"))}</option>
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.paymentStatus || ""} name="paymentStatus">
+                <option value="">{t(lang, "All payment statuses")}</option>
+                <option value="UNPAID">{t(lang, formatEnumLabel("UNPAID"))}</option>
+                <option value="PARTIAL">{t(lang, formatEnumLabel("PARTIAL"))}</option>
+                <option value="PAID">{t(lang, formatEnumLabel("PAID"))}</option>
+                <option value="OVERDUE">{t(lang, formatEnumLabel("OVERDUE"))}</option>
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.scholarshipStatus || ""} name="scholarshipStatus">
+                <option value="">{t(lang, "All scholarship statuses")}</option>
+                <option value="NOT_APPLIED">{t(lang, formatEnumLabel("NOT_APPLIED"))}</option>
+                <option value="APPLIED">{t(lang, formatEnumLabel("APPLIED"))}</option>
+                <option value="UNDER_PROCESS">{t(lang, formatEnumLabel("UNDER_PROCESS"))}</option>
+                <option value="QUERY_BY_DEPARTMENT">{t(lang, formatEnumLabel("QUERY_BY_DEPARTMENT"))}</option>
+                <option value="APPROVED">{t(lang, formatEnumLabel("APPROVED"))}</option>
+                <option value="REJECTED">{t(lang, formatEnumLabel("REJECTED"))}</option>
+              </select>
+              <select className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm" defaultValue={filters.enquiryStatus || ""} name="enquiryStatus">
+                <option value="">{t(lang, "All enquiry statuses")}</option>
+                <option value="NEW">{t(lang, formatEnumLabel("NEW"))}</option>
+                <option value="FOLLOW_UP">{t(lang, formatEnumLabel("FOLLOW_UP"))}</option>
+                <option value="VISIT_SCHEDULED">{t(lang, formatEnumLabel("VISIT_SCHEDULED"))}</option>
+                <option value="COUNSELLED">{t(lang, formatEnumLabel("COUNSELLED"))}</option>
+                <option value="INTERESTED">{t(lang, formatEnumLabel("INTERESTED"))}</option>
+                <option value="DOCUMENTS_PENDING">{t(lang, formatEnumLabel("DOCUMENTS_PENDING"))}</option>
+                <option value="CONVERTED">{t(lang, formatEnumLabel("CONVERTED"))}</option>
+                <option value="LOST">{t(lang, formatEnumLabel("LOST"))}</option>
+              </select>
+              <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" defaultValue={filters.dateFrom || ""} name="dateFrom" type="date" />
+              <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" defaultValue={filters.dateTo || ""} name="dateTo" type="date" />
+            </div>
+          </details>
+          <div className="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-4">
             <button className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white" type="submit">
               {t(lang, "Apply Filters")}
             </button>
             <Link className="rounded-2xl bg-slate-200 px-5 py-3 text-sm font-semibold text-slate-800" href="/modules/reports">
-              {t(lang, "Clear")}
+              {t(lang, "Reset Filters")}
             </Link>
           </div>
         </form>
@@ -367,15 +403,15 @@ export async function ReportsDashboard({
             ))
           ) : (
             <span className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              No active filters
+              {t(lang, "No active filters")}
             </span>
           )}
         </div>
 
         <div className="mt-5 space-y-3">
-          {reportPresetGroups.map((group) => (
-            <div key={group.label} className="flex flex-wrap items-center gap-2">
-              <span className="mr-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{group.label}</span>
+          {REPORT_PRESET_GROUPS.map((group) => (
+            <div key={group.id} className="flex flex-wrap items-center gap-2">
+              <span className="mr-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{t(lang, group.label)}</span>
               {group.items.map((preset) => {
                 const presetQuery = preset.href.split("?")[1] || "";
                 const isActive =
@@ -387,7 +423,7 @@ export async function ReportsDashboard({
 
                 return (
                   <a
-                    key={preset.label}
+                    key={preset.href}
                     className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
                       isActive
                         ? "bg-emerald-100 text-emerald-800"
@@ -395,7 +431,7 @@ export async function ReportsDashboard({
                     }`}
                     href={preset.href}
                   >
-                    {preset.label}
+                    {t(lang, preset.label)}
                   </a>
                 );
               })}
@@ -407,10 +443,11 @@ export async function ReportsDashboard({
       <section className="surface p-6 print:border-none print:shadow-none">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Current View</p>
-            <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">Report Summary</h3>
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Current View")}</p>
+            <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "Report Summary")}</h3>
             <p className="mt-2 text-sm text-slate-600">
-              {previews.length} report panels matched with {totalMatchedRows} total rows in the current filtered view.
+              {previews.length} {t(lang, "report panels matched with")} {totalMatchedRows}{" "}
+              {t(lang, "total rows in the current filtered view.")}
             </p>
           </div>
           <ReportActions />
@@ -419,9 +456,11 @@ export async function ReportsDashboard({
 
       <section className="surface p-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Export Center</p>
-          <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">Quick Downloads</h3>
-          <p className="mt-2 text-sm text-slate-600">Every export below respects the current report filters and date criteria.</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Export Center")}</p>
+          <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, "Quick Downloads")}</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            {t(lang, "Every export below respects the current report filters and date criteria.")}
+          </p>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -440,23 +479,25 @@ export async function ReportsDashboard({
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {summaries.map((item) => (
           <article key={item.key} className="surface p-5">
-            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{item.title}</p>
-            <p className="mt-3 font-serif text-4xl font-semibold tracking-tight text-slate-900">
-              {looksLikeMoneyField(item.title) ? formatInr(item.value) : item.value}
-            </p>
-            <p className="mt-2 text-sm text-slate-600">{item.helper}</p>
             <Link
-              className="mt-4 inline-flex text-sm font-semibold text-emerald-800 hover:underline"
+              className="group block rounded-2xl outline-none ring-slate-900/5 transition hover:bg-slate-50/90 focus-visible:ring-2 -m-2 p-2"
               href={`/modules/reports?report=${item.key}${sharedQuery ? `&${sharedQuery}` : ""}`}
             >
-              Open Report
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t(lang, item.title)}</p>
+              <p className="mt-3 font-serif text-4xl font-semibold tracking-tight text-slate-900 group-hover:text-emerald-900">
+                {looksLikeMoneyField(item.title) ? formatInr(item.value) : translateSummaryValue(item)}
+              </p>
+              <p className="mt-2 text-sm text-slate-600">{translateSummaryHelper(item)}</p>
+              <span className="mt-4 inline-flex text-sm font-semibold text-emerald-800 group-hover:underline">
+                {t(lang, "Open Report")}
+              </span>
             </Link>
-            <Link
-              className="mt-2 inline-flex text-sm font-semibold text-slate-600 hover:underline"
+            <a
+              className="mt-4 inline-flex text-sm font-semibold text-slate-600 hover:underline"
               href={`/api/reports?report=${item.key}${sharedQuery ? `&${sharedQuery}` : ""}&format=csv`}
             >
-              Export CSV
-            </Link>
+              {t(lang, "Export CSV")}
+            </a>
           </article>
         ))}
       </section>
@@ -475,27 +516,29 @@ export async function ReportsDashboard({
                 <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Live Report</p>
-                <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{report.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{report.description}</p>
-                <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">{report.rows.length} matched rows</p>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t(lang, "Live Report")}</p>
+                <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight">{t(lang, report.title)}</h3>
+                <p className="mt-2 text-sm text-slate-600">{t(lang, report.description)}</p>
+                <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                  {report.rows.length} {t(lang, "matched rows")}
+                </p>
               </div>
               <div className="flex w-full flex-wrap gap-3 xl:w-auto">
                 <Link
-                  className="rounded-full bg-slate-200 px-4 py-3 text-sm font-semibold text-slate-800"
+                  className="btn-secondary"
                   href={`/modules/reports?report=${report.key}${sharedQuery ? `&${sharedQuery}` : ""}`}
                 >
-                  Focus Report
+                  {t(lang, "Focus Report")}
                 </Link>
-                <a className="rounded-full bg-emerald-800 px-4 py-3 text-sm font-semibold text-white" href={buildExportHref(report.key, "full")}>
-                  Download Full CSV
+                <a className="btn-primary" href={buildExportHref(report.key, "full")}>
+                  {t(lang, "Download Full CSV")}
                 </a>
-                <a className="rounded-full bg-slate-200 px-4 py-3 text-sm font-semibold text-slate-800" href={buildExportHref(report.key, "current")}>
-                  Current Page CSV
+                <a className="btn-secondary" href={buildExportHref(report.key, "current")}>
+                  {t(lang, "Current Page CSV")}
                 </a>
                 {visibleStudentIds.length ? (
-                  <a className="rounded-full bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-800" href={buildQueueHref(visibleStudentIds)}>
-                    Open Visible In Queue
+                  <a className="btn-secondary" href={buildQueueHref(visibleStudentIds)}>
+                    {t(lang, "Open Visible In Queue")}
                   </a>
                 ) : null}
               </div>
@@ -503,10 +546,12 @@ export async function ReportsDashboard({
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
               <p className="text-slate-600">
-                Showing {(report.rows.length && (safePage - 1) * pageSize + 1) || 0}-{Math.min(safePage * pageSize, report.rows.length)} of {report.rows.length}
+                {t(lang, "Showing")}{" "}
+                {(report.rows.length && (safePage - 1) * pageSize + 1) || 0}-
+                {Math.min(safePage * pageSize, report.rows.length)} {t(lang, "of")} {report.rows.length}
               </p>
               <div className="flex items-center gap-3">
-                <span className="text-slate-600">Rows</span>
+                <span className="text-slate-600">{t(lang, "Rows")}</span>
                 <div className="flex gap-2">
                   {["10", "25", "50"].map((size) => (
                     <a key={size} className={`rounded-xl border px-3 py-2 text-sm font-semibold ${String(pageSize) === size ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-slate-200 text-slate-700"}`} href={buildPageSizeHref(report.key, size)}>
@@ -524,12 +569,14 @@ export async function ReportsDashboard({
                     {report.headers.map((header) => (
                       <th key={header} className="px-4 py-2.5 font-medium">
                         <a className="inline-flex items-center gap-2 hover:text-slate-800" href={buildSortHref(report.key, header)}>
-                          <span>{header}</span>
+                          <span>{t(lang, header)}</span>
                           <span className="text-xs text-slate-400">{sortIndicator(header)}</span>
                         </a>
                       </th>
                     ))}
-                    {report.rows.some((row) => row._detailHref) ? <th className="px-4 py-2.5 font-medium">Action</th> : null}
+                    {report.rows.some((row) => row._detailHref) ? (
+                      <th className="px-4 py-2.5 font-medium">{t(lang, "Action")}</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody>
@@ -545,7 +592,7 @@ export async function ReportsDashboard({
                           <td className="px-4 py-2.5">
                             {row._detailHref ? (
                               <a className="text-sm font-semibold text-emerald-800 hover:underline" href={row._detailHref}>
-                                {row._detailLabel || "Open"}
+                                {row._detailLabel ? t(lang, row._detailLabel) : t(lang, "Open")}
                               </a>
                             ) : (
                               "-"
@@ -557,7 +604,7 @@ export async function ReportsDashboard({
                   ) : (
                     <tr className="border-t border-slate-100">
                       <td className="px-4 py-8 text-center text-slate-500" colSpan={report.headers.length + (report.rows.some((row) => row._detailHref) ? 1 : 0)}>
-                        No rows currently in this queue
+                        {t(lang, "No rows currently in this queue")}
                       </td>
                     </tr>
                   )}
@@ -566,13 +613,15 @@ export async function ReportsDashboard({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-slate-600">Page {safePage} of {totalPages}</p>
+              <p className="text-sm text-slate-600">
+                {t(lang, "Page")} {safePage} {t(lang, "of")} {totalPages}
+              </p>
               <div className="flex gap-2">
                 <a className={`rounded-xl border px-4 py-2 text-sm font-semibold ${safePage <= 1 ? "pointer-events-none border-slate-100 text-slate-300" : "border-slate-200 text-slate-700"}`} href={buildPageHref(report.key, safePage - 1)}>
-                  Previous
+                  {t(lang, "Previous")}
                 </a>
                 <a className={`rounded-xl border px-4 py-2 text-sm font-semibold ${safePage >= totalPages ? "pointer-events-none border-slate-100 text-slate-300" : "border-slate-200 text-slate-700"}`} href={buildPageHref(report.key, safePage + 1)}>
-                  Next
+                  {t(lang, "Next")}
                 </a>
               </div>
             </div>

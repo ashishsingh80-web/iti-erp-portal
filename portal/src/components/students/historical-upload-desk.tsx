@@ -11,6 +11,7 @@ const templateHeaders = [
   "mobile",
   "email",
   "instituteCode",
+  "tradeCode",
   "tradeName",
   "yearLabel",
   "unitNumber",
@@ -50,6 +51,7 @@ export function HistoricalUploadDesk() {
       "9876543210",
       "",
       "ITI01",
+      "EL",
       "Electrician",
       "1st",
       "1",
@@ -104,12 +106,24 @@ export function HistoricalUploadDesk() {
       }
 
       setSummary(result);
-      setMessage(`${result.importedCount || 0} old-session students imported.`);
-      showToast({
-        kind: "success",
-        title: "Historical records imported",
-        message: `${result.importedCount || 0} students added for session ${session}.`
-      });
+      setMessage(
+        `${result.importedCount || 0} imported, ${result.skippedCount || 0} skipped. Check the Skipped list for reasons (e.g. wrong institute/trade code, duplicate studentCode).`
+      );
+      if (!result.importedCount && result.skippedCount) {
+        showToast({
+          kind: "info",
+          title: "No rows imported",
+          message: `All ${result.skippedCount} row(s) were skipped. Open Skipped below for details.`
+        });
+      } else {
+        showToast({
+          kind: "success",
+          title: "Historical records imported",
+          message: `${result.importedCount || 0} students added for session ${session}${
+            result.skippedCount ? `, ${result.skippedCount} skipped` : ""
+          }.`
+        });
+      }
     } catch (error) {
       const nextMessage = error instanceof Error ? error.message : "Unable to import old session students";
       setMessage(nextMessage);
@@ -174,8 +188,8 @@ export function HistoricalUploadDesk() {
           <div className="rounded-3xl border border-amber-100 bg-amber-50/60 p-4">
             <p className="text-sm font-semibold text-amber-900">Skipped</p>
             <p className="mt-1 text-2xl font-semibold text-amber-900">{summary.skippedCount}</p>
-            <div className="mt-3 space-y-2 text-sm text-amber-900">
-              {summary.skipped.slice(0, 8).map((item) => (
+            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto text-sm text-amber-900">
+              {summary.skipped.map((item) => (
                 <p key={item}>{item}</p>
               ))}
             </div>

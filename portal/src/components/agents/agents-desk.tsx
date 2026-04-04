@@ -150,15 +150,15 @@ export function AgentsDesk() {
     { label: "Agent Admission Summary", href: "/modules/reports?report=admissions-summary&admissionMode=AGENT" },
     { label: "Session-wise Agent Report", href: "/modules/reports?report=fees-aging-agent-session" },
     { label: "Agent-wise Admission Report", href: "/modules/reports?report=admissions-summary&admissionMode=AGENT" },
-    { label: "Agent Student List", href: "/modules/fees" },
+    { label: "Agent Student List", href: "/modules/fees?tab=ledger" },
     { label: "Agent Payment Summary", href: "/modules/reports?report=finance-agent-collection-vs-posting" },
     { label: "Agent Due Summary", href: "/modules/reports?report=fees-aging-agent-session" },
-    { label: "Agent Collection Register", href: "/modules/fees" },
+    { label: "Agent Collection Register", href: "/modules/fees?tab=ledger" },
     { label: "Agent Performance Report", href: "/modules/reports?report=agent-statement" },
-    { label: "Current Student Position by Agent", href: "/modules/fees" },
+    { label: "Current Student Position by Agent", href: "/modules/fees?tab=ledger" },
     { label: "Agent Follow-up Register", href: "/modules/enquiry" },
-    { label: "Agent Ledger", href: "/modules/fees" },
-    { label: "Agent Settlement / Commission", href: "/modules/fees" },
+    { label: "Agent Ledger", href: "/modules/fees?tab=ledger" },
+    { label: "Agent Settlement / Commission", href: "/modules/fees?tab=outstanding" },
     { label: "Agent Reports", href: "/modules/reports?report=agent-statement" }
   ];
 

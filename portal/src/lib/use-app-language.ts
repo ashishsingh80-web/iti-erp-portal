@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useContext, useEffect } from "react";
+import { AppLanguageContext } from "@/components/providers/app-language-provider";
 import type { AppLanguage } from "@/lib/i18n";
 import { resolveAppLanguage } from "@/lib/i18n";
 
-export function useAppLanguage() {
-  const [lang, setLang] = useState<AppLanguage>("en");
+export function useAppLanguage(): AppLanguage {
+  const fromContext = useContext(AppLanguageContext);
 
   useEffect(() => {
-    const syncLanguage = () => setLang(resolveAppLanguage(document.documentElement.lang));
-    syncLanguage();
-    window.addEventListener("portal-language-change", syncLanguage);
-    return () => window.removeEventListener("portal-language-change", syncLanguage);
+    const sync = () => {
+      const match = document.cookie.match(/(?:^|; )portal_lang=([^;]*)/);
+      const raw = match ? decodeURIComponent(match[1].trim()) : "";
+      const next = resolveAppLanguage(raw || document.documentElement.getAttribute("lang"));
+      document.documentElement.lang = next === "hi" ? "hi" : "en";
+    };
+    window.addEventListener("portal-language-change", sync);
+    return () => window.removeEventListener("portal-language-change", sync);
   }, []);
 
-  return lang;
+  return fromContext;
 }

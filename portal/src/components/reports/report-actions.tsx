@@ -1,6 +1,10 @@
 "use client";
 
+import { t } from "@/lib/i18n";
+import { useAppLanguage } from "@/lib/use-app-language";
+
 export function ReportActions() {
+  const lang = useAppLanguage();
   return (
     <div className="flex flex-wrap gap-3 print:hidden">
       <button
@@ -8,7 +12,7 @@ export function ReportActions() {
         onClick={() => window.print()}
         type="button"
       >
-        Print Current View
+        {t(lang, "Print Current View")}
       </button>
     </div>
   );

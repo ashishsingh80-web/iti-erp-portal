@@ -14,7 +14,7 @@ async function main() {
   // Includes legacy @itierp.local aliases so older DBs work after re-seed; BHB emails are preferred for new setups.
   const users = [
     { email: "admin@bhb.local", name: "BHB School — Admin", role: "ADMIN", password: "Admin@123" },
-    { email: "admin@itierp.local", name: "Legacy ITI — Admin", role: "ADMIN", password: "Admin@123" },
+    { email: "ashishsingh80@gmail.com", name: "Legacy ITI — Admin", role: "ADMIN", password: "Admin@123" },
     { email: "admission@bhb.local", name: "BHB School — Admission", role: "ADMISSION_STAFF", password: "Admission@123" },
     { email: "admission@itierp.local", name: "Legacy ITI — Admission", role: "ADMISSION_STAFF", password: "Admission@123" },
     { email: "documents@bhb.local", name: "BHB School — Documents", role: "DOCUMENT_VERIFIER", password: "Documents@123" },

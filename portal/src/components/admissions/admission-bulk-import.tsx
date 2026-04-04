@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { t } from "@/lib/i18n";
 import { showToast } from "@/lib/toast";
+import { useAppLanguage } from "@/lib/use-app-language";
 
 const templateHeaders = [
   "fullName",
@@ -55,6 +57,7 @@ type PreviewRow = {
 };
 
 export function AdmissionBulkImport() {
+  const lang = useAppLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<{
@@ -107,7 +110,7 @@ export function AdmissionBulkImport() {
 
   async function previewImport() {
     if (!file) {
-      showToast({ kind: "error", title: "File required", message: "Choose the admissions CSV first." });
+      showToast({ kind: "error", title: t(lang, "File required"), message: t(lang, "Choose the admissions CSV first.") });
       return;
     }
 
@@ -123,20 +126,20 @@ export function AdmissionBulkImport() {
       });
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result?.message || "Unable to preview import");
+        throw new Error(result?.message || t(lang, "Unable to preview import"));
       }
 
       setPreview(result);
       showToast({
         kind: "success",
-        title: "Import preview ready",
-        message: `${result.importableCount} rows can be imported.`
+        title: t(lang, "Import preview ready"),
+        message: `${result.importableCount} ${t(lang, "rows can be imported.")}`
       });
     } catch (error) {
       showToast({
         kind: "error",
-        title: "Preview failed",
-        message: error instanceof Error ? error.message : "Unable to preview admissions import"
+        title: t(lang, "Preview failed"),
+        message: error instanceof Error ? error.message : t(lang, "Unable to preview admissions import")
       });
     } finally {
       setLoading(false);
@@ -158,22 +161,40 @@ export function AdmissionBulkImport() {
       });
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result?.message || "Unable to import admissions");
+        throw new Error(result?.message || t(lang, "Unable to import admissions"));
       }
 
-      showToast({
-        kind: "success",
-        title: "Admissions imported",
-        message: `${result.importedCount} admissions created successfully.`
-      });
+      const skippedNote =
+        result.skippedCount > 0 && Array.isArray(result.skipped)
+          ? ` ${result.skipped.slice(0, 3).join("; ")}${result.skipped.length > 3 ? "…" : ""}`
+          : "";
+
+      if (!result.importedCount) {
+        showToast({
+          kind: "info",
+          title: t(lang, "No admissions imported"),
+          message:
+            result.skippedCount > 0
+              ? `${t(lang, "All rows were skipped.")}${skippedNote}`
+              : t(lang, "No rows were eligible to import. Preview the file and fix blocked rows.")
+        });
+      } else {
+        showToast({
+          kind: "success",
+          title: t(lang, "Admissions imported"),
+          message: `${result.importedCount} ${t(lang, "admissions created successfully.")}${
+            result.skippedCount > 0 ? ` ${result.skippedCount} ${t(lang, "rows skipped.")}${skippedNote}` : ""
+          }`
+        });
+      }
       setPreview(null);
       setFile(null);
       window.location.reload();
     } catch (error) {
       showToast({
         kind: "error",
-        title: "Import failed",
-        message: error instanceof Error ? error.message : "Unable to import admissions"
+        title: t(lang, "Import failed"),
+        message: error instanceof Error ? error.message : t(lang, "Unable to import admissions")
       });
     } finally {
       setLoading(false);
@@ -184,27 +205,30 @@ export function AdmissionBulkImport() {
     <section className="surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="eyebrow-compact">Bulk Import</p>
-          <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-slate-900">Admission Bulk Upload</h3>
+          <p className="eyebrow-compact">{t(lang, "Bulk Import")}</p>
+          <h3 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-slate-900">{t(lang, "Admission Bulk Upload")}</h3>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">
-            Upload a CSV, preview valid and blocked rows, then import only after checking duplicate warnings.
+            {t(
+              lang,
+              "Upload a CSV, preview valid and blocked rows, then import only after checking duplicate warnings."
+            )}
           </p>
         </div>
         <button className="btn-secondary" onClick={downloadTemplate} type="button">
-          Download CSV Template
+          {t(lang, "Download CSV Template")}
         </button>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto]">
         <label className="grid gap-2 text-sm font-medium text-slate-700">
-          Admissions CSV
+          {t(lang, "Admissions CSV")}
           <input className="rounded-2xl border border-slate-200 px-4 py-3 text-sm" type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} />
         </label>
         <button className="btn-primary self-end" disabled={loading} onClick={() => void previewImport()} type="button">
-          {loading ? "Working..." : "Preview Import"}
+          {loading ? t(lang, "Working...") : t(lang, "Preview Import")}
         </button>
         <button className="btn-dark self-end" disabled={loading || !preview?.importableCount} onClick={() => void confirmImport()} type="button">
-          Import Valid Rows
+          {t(lang, "Import valid rows")}
         </button>
       </div>
 
@@ -212,15 +236,15 @@ export function AdmissionBulkImport() {
         <div className="mt-6 space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-3xl border border-slate-100 bg-slate-50 px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Total Rows</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{t(lang, "Total Rows")}</p>
               <p className="mt-2 text-2xl font-semibold text-slate-950">{preview.totalRows}</p>
             </div>
             <div className="rounded-3xl border border-emerald-100 bg-emerald-50 px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-emerald-700">Importable</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-emerald-700">{t(lang, "Importable")}</p>
               <p className="mt-2 text-2xl font-semibold text-emerald-900">{preview.importableCount}</p>
             </div>
             <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-amber-700">Blocked</p>
+              <p className="text-xs uppercase tracking-[0.18em] text-amber-700">{t(lang, "Blocked")}</p>
               <p className="mt-2 text-2xl font-semibold text-amber-900">{preview.rows.filter((item) => !item.canImport).length}</p>
             </div>
           </div>
@@ -229,12 +253,12 @@ export function AdmissionBulkImport() {
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Row</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Student</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Institute / Trade</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Session / Year</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Status</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">Problems</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">{t(lang, "Row")}</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">{t(lang, "Student")}</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">{t(lang, "Institute / Trade")}</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">{t(lang, "Session / Year")}</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">{t(lang, "Status")}</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em]">{t(lang, "Problems")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -251,11 +275,13 @@ export function AdmissionBulkImport() {
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-slate-900">{row.session}</p>
-                      <p className="mt-1 text-xs text-slate-500">{row.yearLabel} • Unit {row.unitNumber || "-"}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {row.yearLabel} • {t(lang, "Unit")} {row.unitNumber || "-"}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.12em] ${row.canImport ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                        {row.canImport ? "READY" : "BLOCKED"}
+                        {row.canImport ? t(lang, "READY") : t(lang, "BLOCKED")}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-700">{row.problems.length ? row.problems.join(", ") : "-"}</td>

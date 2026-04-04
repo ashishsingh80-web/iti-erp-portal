@@ -48,10 +48,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
 
     const nextRole =
       typeof payload.role === "string" && payload.role in UserRole ? (payload.role as UserRole) : undefined;
-    const hasCustomModuleAccess = Boolean(payload.hasCustomModuleAccess);
-    const hasCustomActionAccess = Boolean(payload.hasCustomActionAccess);
-    const allowedModuleSlugs = payload.allowedModuleSlugs || [];
-    const allowedActionKeys = payload.allowedActionKeys || [];
+    const hasCustomModuleAccessProvided = Object.prototype.hasOwnProperty.call(payload, "hasCustomModuleAccess");
+    const hasCustomActionAccessProvided = Object.prototype.hasOwnProperty.call(payload, "hasCustomActionAccess");
+    const allowedModuleSlugsProvided = Object.prototype.hasOwnProperty.call(payload, "allowedModuleSlugs");
+    const allowedActionKeysProvided = Object.prototype.hasOwnProperty.call(payload, "allowedActionKeys");
+    const hasCustomModuleAccess = hasCustomModuleAccessProvided ? Boolean(payload.hasCustomModuleAccess) : existing.hasCustomModuleAccess;
+    const hasCustomActionAccess = hasCustomActionAccessProvided ? Boolean(payload.hasCustomActionAccess) : existing.hasCustomActionAccess;
+    const allowedModuleSlugs = allowedModuleSlugsProvided ? payload.allowedModuleSlugs || [] : existing.allowedModuleSlugs;
+    const allowedActionKeys = allowedActionKeysProvided ? payload.allowedActionKeys || [] : existing.allowedActionKeys;
     if (hasCustomModuleAccess && hasCustomActionAccess) {
       const invalidActionKeys = findInvalidActionKeysForModules(allowedActionKeys, allowedModuleSlugs);
       if (invalidActionKeys.length) {
@@ -69,10 +73,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ userI
       where: { id: userId },
       data: {
         ...(nextRole ? { role: nextRole } : {}),
-        hasCustomModuleAccess,
-        allowedModuleSlugs,
-        hasCustomActionAccess,
-        allowedActionKeys,
+        ...(hasCustomModuleAccessProvided ? { hasCustomModuleAccess } : {}),
+        ...(allowedModuleSlugsProvided ? { allowedModuleSlugs } : {}),
+        ...(hasCustomActionAccessProvided ? { hasCustomActionAccess } : {}),
+        ...(allowedActionKeysProvided ? { allowedActionKeys } : {}),
         ...(typeof payload.isActive === "boolean" ? { isActive: payload.isActive } : {}),
         ...(payload.password?.trim() ? { passwordHash: hashPassword(payload.password.trim()) } : {})
       }

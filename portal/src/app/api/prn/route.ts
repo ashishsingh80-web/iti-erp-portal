@@ -30,10 +30,10 @@ export async function GET(request: Request) {
               ...(search
                 ? {
                     OR: [
-                      { fullName: { contains: search, mode: "insensitive" as const } },
-                      { studentCode: { contains: search, mode: "insensitive" as const } },
-                      { mobile: { contains: search, mode: "insensitive" as const } },
-                      { prnScvtRecord: { prnNumber: { contains: search, mode: "insensitive" as const } } }
+                      { fullName: { startsWith: search, mode: "insensitive" as const } },
+                      { studentCode: { startsWith: search, mode: "insensitive" as const } },
+                      { mobile: { startsWith: search, mode: "insensitive" as const } },
+                      { prnScvtRecord: { prnNumber: { startsWith: search, mode: "insensitive" as const } } }
                     ]
                   }
                 : {})

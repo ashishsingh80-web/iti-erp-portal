@@ -35,7 +35,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { AdmissionsExpandControls } from "@/components/admissions/admissions-expand-controls";
-import { t } from "@/lib/i18n";
+import { type AppLanguage, t } from "@/lib/i18n";
 import { showToast } from "@/lib/toast";
 import type { SelectOption } from "@/lib/types";
 import { useAppLanguage } from "@/lib/use-app-language";
@@ -43,11 +43,13 @@ import { admissionPayloadSchema } from "@/lib/validations/admission";
 import type { StateMap } from "@/lib/address-masters";
 
 function CollapsibleAdmissionSection({
+  lang,
   title,
   description,
   defaultOpen = false,
   children
 }: {
+  lang: AppLanguage;
   title: string;
   description?: string;
   defaultOpen?: boolean;
@@ -61,7 +63,7 @@ function CollapsibleAdmissionSection({
           {description ? <p className="mt-1 text-xs text-slate-500">{description}</p> : null}
         </div>
         <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-          Toggle
+          {t(lang, "Expand")}
         </span>
       </summary>
       <div className="border-t border-slate-100 p-5">{children}</div>
@@ -397,7 +399,7 @@ export function AdmissionFormPreview() {
       }
 
       setMessage(`${t(lang, "Admission created successfully.")} ${t(lang, "Student code")}: ${result.studentCode}`);
-      showToast({ kind: "success", title: t(lang, "Admission saved"), message: `Student code: ${result.studentCode}` });
+      showToast({ kind: "success", title: t(lang, "Admission saved"), message: `${t(lang, "Student code")}: ${result.studentCode}` });
       setForm(admissionFormDefaults);
       setStudentPhotoFile(null);
       setQualificationFiles({});
@@ -435,6 +437,7 @@ export function AdmissionFormPreview() {
         <div className="grid gap-6 xl:grid-cols-2" id="admission-form-expand-zone">
           <div className="space-y-4">
             <CollapsibleAdmissionSection
+              lang={lang}
               title={t(lang, "Admission Basics")}
               description={t(lang, "Institute, trade, session, student identity, and address details.")}
               defaultOpen
@@ -450,9 +453,9 @@ export function AdmissionFormPreview() {
                 <Input label={t(lang, "Session")} required errorText={fieldError("session")} helperText={t(lang, selectedTradeMeta?.durationYears === 1 ? "Auto-selected from active 1-year session setting" : "Auto-selected from active 2-year session setting")} value={form.session} onChange={() => undefined} readOnly />
                 <Select label={t(lang, "Year")} required errorText={fieldError("year")} options={availableYearOptions} value={form.yearLabel} onChange={(event) => updateField("yearLabel", event.target.value)} />
                 <Input label={t(lang, "Admission Date")} helperText={t(lang, "Optional")} type="date" value={form.admissionDate} onChange={(event) => updateField("admissionDate", event.target.value)} />
-                <Select label={t(lang, "Admission Type")} options={[{ label: "Direct", value: "DIRECT" }, { label: "Counselling", value: "COUNSELLING" }, { label: "Management", value: "MANAGEMENT" }, { label: "Portal", value: "PORTAL" }]} value={form.admissionType} onChange={(event) => updateField("admissionType", event.target.value)} />
-                <Select label={t(lang, "Admission Status")} options={[{ label: "Inquiry", value: "INQUIRY" }, { label: "Registered", value: "REGISTERED" }, { label: "Documents Pending", value: "DOCUMENTS_PENDING" }, { label: "Admitted", value: "ADMITTED" }, { label: "Provisionally Admitted", value: "PROVISIONALLY_ADMITTED" }, { label: "Canceled", value: "CANCELED" }, { label: "Dropped", value: "DROPPED" }, { label: "Transferred", value: "TRANSFERRED" }]} value={form.admissionStatusLabel} onChange={(event) => updateField("admissionStatusLabel", event.target.value)} />
-                <Select label={t(lang, "Seat Type")} options={[{ label: "Regular", value: "REGULAR" }, { label: "Management", value: "MANAGEMENT" }, { label: "Counselling", value: "COUNSELLING" }, { label: "Reserved", value: "RESERVED" }]} value={form.seatType} onChange={(event) => updateField("seatType", event.target.value)} />
+                <Select label={t(lang, "Admission Type")} options={[{ label: t(lang, "Direct"), value: "DIRECT" }, { label: t(lang, "Counselling"), value: "COUNSELLING" }, { label: t(lang, "Management"), value: "MANAGEMENT" }, { label: t(lang, "Portal"), value: "PORTAL" }]} value={form.admissionType} onChange={(event) => updateField("admissionType", event.target.value)} />
+                <Select label={t(lang, "Admission Status")} options={[{ label: t(lang, "Inquiry"), value: "INQUIRY" }, { label: t(lang, "Registered"), value: "REGISTERED" }, { label: t(lang, "Documents Pending"), value: "DOCUMENTS_PENDING" }, { label: t(lang, "Admitted"), value: "ADMITTED" }, { label: t(lang, "Provisionally Admitted"), value: "PROVISIONALLY_ADMITTED" }, { label: t(lang, "Canceled"), value: "CANCELED" }, { label: t(lang, "Dropped"), value: "DROPPED" }, { label: t(lang, "Transferred"), value: "TRANSFERRED" }]} value={form.admissionStatusLabel} onChange={(event) => updateField("admissionStatusLabel", event.target.value)} />
+                <Select label={t(lang, "Seat Type")} options={[{ label: t(lang, "Regular"), value: "REGULAR" }, { label: t(lang, "Management"), value: "MANAGEMENT" }, { label: t(lang, "Counselling"), value: "COUNSELLING" }, { label: t(lang, "Reserved"), value: "RESERVED" }]} value={form.seatType} onChange={(event) => updateField("seatType", event.target.value)} />
                 <Input label={t(lang, "Roll Number")} helperText={t(lang, "Optional")} value={form.rollNumber} onChange={(event) => updateField("rollNumber", event.target.value)} />
                 <Input label={t(lang, "Batch")} helperText={t(lang, "Optional")} value={form.batchLabel} onChange={(event) => updateField("batchLabel", event.target.value)} />
                 <Input label={t(lang, "Shift")} helperText={t(lang, "Optional")} value={form.shiftLabel} onChange={(event) => updateField("shiftLabel", event.target.value)} />
@@ -460,7 +463,7 @@ export function AdmissionFormPreview() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                     <span>{t(lang, "Date of Birth")}</span>
-                    <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">Required</span>
+                    <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">{t(lang, "Required")}</span>
                   </div>
                   <div className="flex gap-2">
                     <input
@@ -470,7 +473,7 @@ export function AdmissionFormPreview() {
                           ? "border-rose-300 bg-rose-50/60 focus:border-rose-500"
                           : "border-slate-200 focus:border-emerald-600"
                       }`}
-                      placeholder="DD/MM/YYYY"
+                      placeholder={t(lang, "DD/MM/YYYY")}
                       value={form.dateOfBirth}
                       onChange={(event) => updateField("dateOfBirth", event.target.value)}
                     />
@@ -503,7 +506,7 @@ export function AdmissionFormPreview() {
                 <Select label={t(lang, "Category")} helperText={t(lang, "Optional")} options={dynamicCategoryOptions} value={form.category} onChange={(event) => updateField("category", event.target.value)} />
                 <Select label={t(lang, "Caste")} helperText={t(lang, "Optional")} options={dynamicCasteOptions} value={form.caste} onChange={(event) => updateField("caste", event.target.value)} />
                 <Select label={t(lang, "Religion")} helperText={t(lang, "Optional")} options={dynamicReligionOptions} value={form.religion} onChange={(event) => updateField("religion", event.target.value)} />
-                <Select label={t(lang, "Marital Status")} helperText={t(lang, "Optional")} options={[{ label: "Single", value: "SINGLE" }, { label: "Married", value: "MARRIED" }, { label: "Other", value: "OTHER" }]} value={form.maritalStatus} onChange={(event) => updateField("maritalStatus", event.target.value)} />
+                <Select label={t(lang, "Marital Status")} helperText={t(lang, "Optional")} options={[{ label: t(lang, "Single"), value: "SINGLE" }, { label: t(lang, "Married"), value: "MARRIED" }, { label: t(lang, "Other"), value: "OTHER" }]} value={form.maritalStatus} onChange={(event) => updateField("maritalStatus", event.target.value)} />
                 <Input label={t(lang, "Student Aadhaar")} required errorText={fieldError("aadhaar")} helperText={t(lang, "12 digits")} value={form.studentAadhaar} onChange={(event) => updateField("studentAadhaar", event.target.value)} />
                 <Select label={t(lang, "Country")} helperText={t(lang, "Choose from list or type below")} options={countryOptions} value={form.country} onChange={(event) => updateField("country", event.target.value)} />
                 <Input label={t(lang, "Country (Manual)")} helperText={t(lang, "Type manually if not in list")} value={form.country} onChange={(event) => updateField("country", event.target.value)} />
@@ -557,6 +560,7 @@ export function AdmissionFormPreview() {
 
           <div className="space-y-4">
             <CollapsibleAdmissionSection
+              lang={lang}
               title={t(lang, "Parent and Eligibility")}
               description={t(lang, "Guardian information, qualification details, and eligibility checks.")}
               defaultOpen
@@ -572,6 +576,7 @@ export function AdmissionFormPreview() {
             </CollapsibleAdmissionSection>
 
             <CollapsibleAdmissionSection
+              lang={lang}
               title={t(lang, "Qualifications")}
               description={t(lang, "School, board, marks, and certificate details.")}
             >
@@ -621,6 +626,7 @@ export function AdmissionFormPreview() {
             </CollapsibleAdmissionSection>
 
             <CollapsibleAdmissionSection
+              lang={lang}
               title={t(lang, "Eligibility and Certificates")}
               description={t(lang, "10th pass confirmation, scholarship, and required certificate uploads.")}
             >
@@ -672,6 +678,7 @@ export function AdmissionFormPreview() {
             </CollapsibleAdmissionSection>
 
             <CollapsibleAdmissionSection
+              lang={lang}
               title={t(lang, "Admission Mode and Agent")}
               description={t(lang, "Control the source of admission and any agent mapping.")}
             >
@@ -682,6 +689,7 @@ export function AdmissionFormPreview() {
             </CollapsibleAdmissionSection>
 
             <CollapsibleAdmissionSection
+              lang={lang}
               title={t(lang, "Internal Notes")}
               description={t(lang, "Private office notes for this admission entry.")}
             >

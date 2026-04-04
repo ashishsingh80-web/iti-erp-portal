@@ -38,13 +38,13 @@ export async function listGrievanceDeskData(search = "", status = "") {
         ...(search.trim()
           ? {
               OR: [
-                { grievanceNo: { contains: search.trim(), mode: "insensitive" } },
-                { title: { contains: search.trim(), mode: "insensitive" } },
-                { category: { contains: search.trim(), mode: "insensitive" } },
-                { reportedByName: { contains: search.trim(), mode: "insensitive" } },
-                { assignedToName: { contains: search.trim(), mode: "insensitive" } },
-                { student: { fullName: { contains: search.trim(), mode: "insensitive" } } },
-                { staff: { fullName: { contains: search.trim(), mode: "insensitive" } } }
+                { grievanceNo: { startsWith: search.trim(), mode: "insensitive" } },
+                { title: { startsWith: search.trim(), mode: "insensitive" } },
+                { category: { startsWith: search.trim(), mode: "insensitive" } },
+                { reportedByName: { startsWith: search.trim(), mode: "insensitive" } },
+                { assignedToName: { startsWith: search.trim(), mode: "insensitive" } },
+                { student: { fullName: { startsWith: search.trim(), mode: "insensitive" } } },
+                { staff: { fullName: { startsWith: search.trim(), mode: "insensitive" } } }
               ]
             }
           : {})

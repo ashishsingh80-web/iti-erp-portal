@@ -8,6 +8,8 @@ export type StudentDirectoryRow = {
   photoUrl: string | null;
   studentCode: string;
   fullName: string;
+  agentCode?: string;
+  agentName?: string;
   instituteCode: string;
   instituteName: string;
   tradeName: string;

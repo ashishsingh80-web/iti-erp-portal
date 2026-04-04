@@ -110,10 +110,10 @@ export async function getDocumentsStageBoard(): Promise<StageBoardData> {
     title: "Documents",
     subtitle: "Upload, verifier action, and completion queue",
     metrics: [
-      { label: "Pending", value: String(pending), tone: "warning", href: "/modules/students?documentsStatus=PENDING" },
-      { label: "Incomplete", value: String(incomplete), tone: "danger", href: "/modules/students?documentsStatus=INCOMPLETE" },
-      { label: "Rejected", value: String(rejected), tone: "danger", href: "/modules/students?documentsStatus=REJECTED" },
-      { label: "Verified", value: String(verified), tone: "success", href: "/modules/students?documentsStatus=VERIFIED" }
+      { label: "Pending", value: String(pending), tone: "warning", href: "/modules/documents?status=PENDING" },
+      { label: "Incomplete", value: String(incomplete), tone: "danger", href: "/modules/documents?status=INCOMPLETE" },
+      { label: "Rejected", value: String(rejected), tone: "danger", href: "/modules/documents?status=REJECTED" },
+      { label: "Verified", value: String(verified), tone: "success", href: "/modules/documents?status=VERIFIED" }
     ],
     rows: rows.map((item) => ({
       id: item.id,
@@ -149,10 +149,10 @@ export async function getFeesStageBoard(): Promise<StageBoardData> {
     title: "Fees",
     subtitle: "Due amount stages and finance follow-up",
     metrics: [
-      { label: "Unpaid", value: String(unpaid), tone: "danger", href: "/modules/students?paymentStatus=UNPAID" },
-      { label: "Partial", value: String(partial), tone: "warning", href: "/modules/students?paymentStatus=PARTIAL" },
+      { label: "Unpaid", value: String(unpaid), tone: "danger", href: "/modules/fees?tab=collect" },
+      { label: "Partial", value: String(partial), tone: "warning", href: "/modules/fees?tab=collect" },
       { label: "Paid", value: String(paid), tone: "success", href: "/modules/students?paymentStatus=PAID" },
-      { label: "Due Cases", value: String(dueCases), tone: "warning", href: "/modules/fees" }
+      { label: "Due Cases", value: String(dueCases), tone: "warning", href: "/modules/fees?tab=collect" }
     ],
     rows: rows.map((item) => ({
       id: item.id,
@@ -198,10 +198,10 @@ export async function getScholarshipStageBoard(): Promise<StageBoardData> {
     title: "Scholarship",
     subtitle: "Application, query, approval, and credit stages",
     metrics: [
-      { label: "Applied", value: String(applied), tone: "default", href: "/modules/students?scholarshipStatus=APPLIED" },
-      { label: "Under Process", value: String(underProcess), tone: "warning", href: "/modules/students?scholarshipStatus=UNDER_PROCESS" },
-      { label: "Query", value: String(query), tone: "danger", href: "/modules/students?scholarshipStatus=QUERY_BY_DEPARTMENT" },
-      { label: "Approved", value: String(approved), tone: "success", href: "/modules/students?scholarshipStatus=APPROVED" }
+      { label: "Applied", value: String(applied), tone: "default", href: "/modules/scholarship?status=APPLIED" },
+      { label: "Under Process", value: String(underProcess), tone: "warning", href: "/modules/scholarship?status=UNDER_PROCESS" },
+      { label: "Query", value: String(query), tone: "danger", href: "/modules/scholarship?status=QUERY_BY_DEPARTMENT" },
+      { label: "Approved", value: String(approved), tone: "success", href: "/modules/scholarship?status=APPROVED" }
     ],
     rows: rows.map((item) => ({
       id: item.id,
@@ -285,7 +285,7 @@ export async function getScvtStageBoard(): Promise<StageBoardData> {
     title: "SCVT",
     subtitle: "SCVT registration completion and verification queue",
     metrics: [
-      { label: "SCVT Missing", value: String(missingScvt), tone: "warning", href: "/modules/students?missingScvt=1" },
+      { label: "SCVT Missing", value: String(missingScvt), tone: "warning", href: "/modules/scvt" },
       { label: "Incomplete", value: String(incomplete), tone: "danger", href: "/modules/students?scvtVerificationStatus=INCOMPLETE" },
       { label: "Verified", value: String(verified), tone: "success", href: "/modules/students?scvtVerificationStatus=VERIFIED" }
     ],

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { assertUserActionAccess, canUserPerformAction } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
+import { resolveAppLanguage } from "@/lib/i18n";
+import { readAppLanguage } from "@/lib/i18n-server";
 import {
   buildCsvReport,
   getReportData,
@@ -82,7 +84,9 @@ export async function GET(request: Request) {
     };
 
     if (format === "csv") {
-      const csv = buildCsvReport(finalDefinition);
+      const langParam = searchParams.get("lang");
+      const lang = langParam !== null ? resolveAppLanguage(langParam) : await readAppLanguage();
+      const csv = buildCsvReport(finalDefinition, lang);
       return new NextResponse(csv, {
         headers: {
           "Content-Type": "text/csv; charset=utf-8",

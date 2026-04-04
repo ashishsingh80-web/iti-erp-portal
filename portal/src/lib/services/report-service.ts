@@ -1,4 +1,6 @@
 import { AttendancePersonType, EnquiryStatus, LibraryIssueStatus, PaymentStatus, ScholarshipStatus, StudentStatus, VerificationStatus } from "@prisma/client";
+import { type AppLanguage, t } from "@/lib/i18n";
+import { formatReportCsvCell } from "@/lib/report-export-format";
 import { prisma } from "@/lib/prisma";
 import { listCommunicationDeskData } from "@/lib/services/communication-service";
 import { getPeriodicFinanceSummary } from "@/lib/services/accounts-service";
@@ -160,9 +162,9 @@ function buildStudentWhere(filters: ReportFilters) {
     ...(search
       ? {
           OR: [
-            { fullName: { contains: search, mode: "insensitive" as const } },
-            { studentCode: { contains: search, mode: "insensitive" as const } },
-            { mobile: { contains: search, mode: "insensitive" as const } }
+            { fullName: { startsWith: search, mode: "insensitive" as const } },
+            { studentCode: { startsWith: search, mode: "insensitive" as const } },
+            { mobile: { startsWith: search, mode: "insensitive" as const } }
           ]
         }
       : {})
@@ -212,9 +214,9 @@ function buildEnquiryWhere(filters: ReportFilters, tradeIds: string[] | null, du
     ...(search
       ? {
           OR: [
-            { fullName: { contains: search, mode: "insensitive" as const } },
-            { mobile: { contains: search } },
-            { assignedCounsellor: { contains: search, mode: "insensitive" as const } }
+            { fullName: { startsWith: search, mode: "insensitive" as const } },
+            { mobile: { startsWith: search } },
+            { assignedCounsellor: { startsWith: search, mode: "insensitive" as const } }
           ]
         }
       : {}),
@@ -394,9 +396,9 @@ export async function getReportSummaries(filters: ReportFilters = {}) {
         ...(filters.search
           ? {
               OR: [
-                { targetName: { contains: filters.search.trim(), mode: "insensitive" } },
-                { targetMobile: { contains: filters.search.trim() } },
-                { targetEmail: { contains: filters.search.trim(), mode: "insensitive" } }
+                { targetName: { startsWith: filters.search.trim(), mode: "insensitive" } },
+                { targetMobile: { startsWith: filters.search.trim() } },
+                { targetEmail: { startsWith: filters.search.trim(), mode: "insensitive" } }
               ]
             }
           : {})
@@ -407,8 +409,8 @@ export async function getReportSummaries(filters: ReportFilters = {}) {
         ...(filters.search
           ? {
               OR: [
-                { grievanceNo: { contains: filters.search.trim(), mode: "insensitive" } },
-                { title: { contains: filters.search.trim(), mode: "insensitive" } }
+                { grievanceNo: { startsWith: filters.search.trim(), mode: "insensitive" } },
+                { title: { startsWith: filters.search.trim(), mode: "insensitive" } }
               ]
             }
           : {})
@@ -419,8 +421,8 @@ export async function getReportSummaries(filters: ReportFilters = {}) {
         ...(filters.search
           ? {
               OR: [
-                { employerName: { contains: filters.search.trim(), mode: "insensitive" } },
-                { student: { fullName: { contains: filters.search.trim(), mode: "insensitive" } }
+                { employerName: { startsWith: filters.search.trim(), mode: "insensitive" } },
+                { student: { fullName: { startsWith: filters.search.trim(), mode: "insensitive" } }
                 }
               ]
             }
@@ -809,6 +811,10 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
             "61-90 Days": String(item.bucket61to90),
             "90+ Days": String(item.bucket90plus),
             _detailHref: `/modules/fees${buildModuleQuery({
+              tab:
+                item.channel === "AGENT" && item.agent !== "UNMAPPED_AGENT"
+                  ? "ledger"
+                  : "collect",
               session: item.session,
               agentCode: item.channel === "AGENT" && item.agent !== "UNMAPPED_AGENT" ? item.agent : undefined,
               instituteCode: filters.instituteCode,
@@ -1108,8 +1114,8 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
               ? {
                   agent: {
                     OR: [
-                      { name: { contains: filters.search, mode: "insensitive" } },
-                      { agentCode: { contains: filters.search, mode: "insensitive" } }
+                      { name: { startsWith: filters.search, mode: "insensitive" } },
+                      { agentCode: { startsWith: filters.search, mode: "insensitive" } }
                     ]
                   }
                 }
@@ -1161,6 +1167,7 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
             Unallocated: Number(item.unallocatedAmount || 0).toFixed(2),
             "Posting Gap": (allocated - posted).toFixed(2),
             _detailHref: `/modules/fees${buildModuleQuery({
+              tab: "ledger",
               agentCode: item.agent.agentCode,
               session: filters.session,
               yearLabel: filters.yearLabel
@@ -1346,6 +1353,7 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
           Collections: agent.collections.reduce((sum, row) => sum + Number(row.totalAmount), 0).toFixed(2),
           Unallocated: agent.collections.reduce((sum, row) => sum + Number(row.unallocatedAmount), 0).toFixed(2),
           _detailHref: `/modules/fees${buildModuleQuery({
+            tab: "ledger",
             agentCode: agent.agentCode,
             session: filters.session,
             yearLabel: filters.yearLabel,
@@ -1894,6 +1902,7 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
             Collections: item.collections.toFixed(2),
             "Outstanding Due": item.dueAmount.toFixed(2),
             _detailHref: `/modules/fees${buildModuleQuery({
+              tab: "collect",
               session: item.session,
               instituteCode: filters.instituteCode,
               yearLabel: filters.yearLabel
@@ -1905,10 +1914,12 @@ export async function getReportData(report: ReportKey, filters: ReportFilters = 
   }
 }
 
-export function buildCsvReport(definition: ReportDefinition) {
-  const headerRow = definition.headers.map(escapeCsv).join(",");
+export function buildCsvReport(definition: ReportDefinition, lang: AppLanguage = "en") {
+  const headerRow = definition.headers.map((header) => escapeCsv(t(lang, header))).join(",");
   const bodyRows = definition.rows.map((row) =>
-    definition.headers.map((header) => escapeCsv(row[header] || "")).join(",")
+    definition.headers
+      .map((header) => escapeCsv(formatReportCsvCell(lang, header, row[header])))
+      .join(",")
   );
 
   return [headerRow, ...bodyRows].join("\n");

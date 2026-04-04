@@ -49,9 +49,9 @@ export async function listPlacementDeskData(search = "", status = "") {
         ...(search.trim()
           ? {
               OR: [
-                { companyName: { contains: search.trim(), mode: "insensitive" } },
-                { companyCode: { contains: search.trim(), mode: "insensitive" } },
-                { contactPerson: { contains: search.trim(), mode: "insensitive" } }
+                { companyName: { startsWith: search.trim(), mode: "insensitive" } },
+                { companyCode: { startsWith: search.trim(), mode: "insensitive" } },
+                { contactPerson: { startsWith: search.trim(), mode: "insensitive" } }
               ]
             }
           : {})
@@ -66,8 +66,8 @@ export async function listPlacementDeskData(search = "", status = "") {
         ...(search.trim()
           ? {
               OR: [
-                { fullName: { contains: search.trim(), mode: "insensitive" } },
-                { studentCode: { contains: search.trim(), mode: "insensitive" } }
+                { fullName: { startsWith: search.trim(), mode: "insensitive" } },
+                { studentCode: { startsWith: search.trim(), mode: "insensitive" } }
               ]
             }
           : {})
@@ -85,10 +85,10 @@ export async function listPlacementDeskData(search = "", status = "") {
         ...(search.trim()
           ? {
               OR: [
-                { employerName: { contains: search.trim(), mode: "insensitive" } },
-                { designation: { contains: search.trim(), mode: "insensitive" } },
-                { student: { fullName: { contains: search.trim(), mode: "insensitive" } } },
-                { student: { studentCode: { contains: search.trim(), mode: "insensitive" } } }
+                { employerName: { startsWith: search.trim(), mode: "insensitive" } },
+                { designation: { startsWith: search.trim(), mode: "insensitive" } },
+                { student: { fullName: { startsWith: search.trim(), mode: "insensitive" } } },
+                { student: { studentCode: { startsWith: search.trim(), mode: "insensitive" } } }
               ]
             }
           : {})

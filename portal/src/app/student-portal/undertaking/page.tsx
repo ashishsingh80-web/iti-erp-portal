@@ -62,7 +62,7 @@ export default async function StudentPortalUndertakingPage() {
     <div className="mx-auto max-w-4xl bg-stone-50 p-6 print:bg-white print:p-0">
       <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm print:rounded-none print:border-none print:shadow-none">
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 pb-6">
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-4 print:hidden">
             <img alt="Institute logo" className="h-20 w-20 object-contain" src={branding?.logoUrl || "/portal-logo.png"} />
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Student Portal Undertaking</p>

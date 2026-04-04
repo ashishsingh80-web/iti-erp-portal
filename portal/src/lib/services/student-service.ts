@@ -51,6 +51,15 @@ type StudentOrderKey =
   | "dueAmount";
 
 function buildStudentWhere(filters: StudentDirectoryFilters, search: string): any {
+  const prnScvtRecord: Record<string, unknown> = {};
+  if (filters.missingPrn) prnScvtRecord.prnNumber = null;
+  if (filters.missingScvt) prnScvtRecord.scvtRegistrationNumber = null;
+  if (filters.scvtVerificationStatus) prnScvtRecord.verificationStatus = filters.scvtVerificationStatus as never;
+
+  const undertakingRecord: Record<string, unknown> = {};
+  if (filters.undertakingSignedStatus) undertakingRecord.signedStatus = filters.undertakingSignedStatus as never;
+  if (filters.undertakingGenerationStatus) undertakingRecord.generationStatus = filters.undertakingGenerationStatus as never;
+
   return {
     deletedAt: null,
     ...(filters.ids?.length ? { id: { in: filters.ids } } : {}),
@@ -75,41 +84,8 @@ function buildStudentWhere(filters: StudentDirectoryFilters, search: string): an
           }
         }
       : {}),
-    ...(filters.missingPrn
-      ? {
-          prnScvtRecord: {
-            prnNumber: null
-          }
-        }
-      : {}),
-    ...(filters.missingScvt
-      ? {
-          prnScvtRecord: {
-            scvtRegistrationNumber: null
-          }
-        }
-      : {}),
-    ...(filters.scvtVerificationStatus
-      ? {
-          prnScvtRecord: {
-            verificationStatus: filters.scvtVerificationStatus as never
-          }
-        }
-      : {}),
-    ...(filters.undertakingSignedStatus
-      ? {
-          undertakingRecord: {
-            signedStatus: filters.undertakingSignedStatus as never
-          }
-        }
-      : {}),
-    ...(filters.undertakingGenerationStatus
-      ? {
-          undertakingRecord: {
-            generationStatus: filters.undertakingGenerationStatus as never
-          }
-        }
-      : {}),
+    ...(Object.keys(prnScvtRecord).length ? { prnScvtRecord } : {}),
+    ...(Object.keys(undertakingRecord).length ? { undertakingRecord } : {}),
     ...(filters.instituteCode
       ? {
           institute: {
@@ -134,9 +110,9 @@ function buildStudentWhere(filters: StudentDirectoryFilters, search: string): an
     ...(search
       ? {
           OR: [
-            { fullName: { contains: search, mode: "insensitive" } },
-            { studentCode: { contains: search, mode: "insensitive" } },
-            { mobile: { contains: search, mode: "insensitive" } }
+            { fullName: { startsWith: search, mode: "insensitive" } },
+            { studentCode: { startsWith: search, mode: "insensitive" } },
+            { mobile: { startsWith: search, mode: "insensitive" } }
           ]
         }
       : {})
@@ -165,6 +141,8 @@ function mapDirectoryRow(row: any): StudentDirectoryRow {
     photoUrl: row.documents[0]?.fileUrl || null,
     studentCode: row.studentCode,
     fullName: row.fullName,
+    agentCode: row.agent?.agentCode || undefined,
+    agentName: row.agent?.name || undefined,
     instituteCode: row.institute.instituteCode,
     instituteName: row.institute.name,
     tradeName: row.trade.name,
@@ -188,6 +166,12 @@ export async function listStudents(filters: StudentDirectoryFilters = {}): Promi
     include: {
       institute: true,
       trade: true,
+      agent: {
+        select: {
+          agentCode: true,
+          name: true
+        }
+      },
       feeProfile: true,
       documents: {
         where: {
@@ -226,6 +210,12 @@ export async function listStudentsPage(
       include: {
         institute: true,
         trade: true,
+        agent: {
+          select: {
+            agentCode: true,
+            name: true
+          }
+        },
         feeProfile: true,
         documents: {
           where: {

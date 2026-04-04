@@ -8,10 +8,10 @@ export async function listLibraryDeskData(search = "", category = "") {
     ...(search.trim()
       ? {
           OR: [
-            { accessionNumber: { contains: search.trim(), mode: "insensitive" } },
-            { title: { contains: search.trim(), mode: "insensitive" } },
-            { authorName: { contains: search.trim(), mode: "insensitive" } },
-            { shelfLocation: { contains: search.trim(), mode: "insensitive" } }
+            { accessionNumber: { startsWith: search.trim(), mode: "insensitive" } },
+            { title: { startsWith: search.trim(), mode: "insensitive" } },
+            { authorName: { startsWith: search.trim(), mode: "insensitive" } },
+            { shelfLocation: { startsWith: search.trim(), mode: "insensitive" } }
           ]
         }
       : {})
@@ -22,9 +22,9 @@ export async function listLibraryDeskData(search = "", category = "") {
     ...(search.trim()
       ? {
           OR: [
-            { fullName: { contains: search.trim(), mode: "insensitive" } },
-            { studentCode: { contains: search.trim(), mode: "insensitive" } },
-            { mobile: { contains: search.trim() } }
+            { fullName: { startsWith: search.trim(), mode: "insensitive" } },
+            { studentCode: { startsWith: search.trim(), mode: "insensitive" } },
+            { mobile: { startsWith: search.trim() } }
           ]
         }
       : {})
@@ -47,10 +47,10 @@ export async function listLibraryDeskData(search = "", category = "") {
         ...(search.trim()
           ? {
               OR: [
-                { student: { fullName: { contains: search.trim(), mode: "insensitive" } } },
-                { student: { studentCode: { contains: search.trim(), mode: "insensitive" } } },
-                { book: { accessionNumber: { contains: search.trim(), mode: "insensitive" } } },
-                { book: { title: { contains: search.trim(), mode: "insensitive" } } }
+                { student: { fullName: { startsWith: search.trim(), mode: "insensitive" } } },
+                { student: { studentCode: { startsWith: search.trim(), mode: "insensitive" } } },
+                { book: { accessionNumber: { startsWith: search.trim(), mode: "insensitive" } } },
+                { book: { title: { startsWith: search.trim(), mode: "insensitive" } } }
               ]
             }
           : {})

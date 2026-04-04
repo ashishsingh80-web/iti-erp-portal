@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import type { Route } from "next";
+import { useEffect, useRef, useState } from "react";
 import { OcrImportDesk } from "@/components/modules/ocr-import-desk";
 import { formatInr } from "@/lib/currency";
 import { showToast } from "@/lib/toast";
@@ -34,15 +37,18 @@ const statusOptions = [
   "REJECTED"
 ] as const;
 
-export function ScholarshipDesk() {
+export function ScholarshipDesk({ initialStatus = "" }: { initialStatus?: string }) {
+  const searchParams = useSearchParams();
+  const urlStatus = searchParams.get("status") ?? initialStatus ?? "";
   const [rows, setRows] = useState<ScholarshipRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(urlStatus);
   const [session, setSession] = useState("");
   const [yearLabel, setYearLabel] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const skipUrlReload = useRef(true);
 
   async function loadRows() {
     setLoading(true);
@@ -70,6 +76,15 @@ export function ScholarshipDesk() {
     setCounts(result.counts && typeof result.counts === "object" ? result.counts : {});
     setLoading(false);
   }
+
+  useEffect(() => {
+    if (skipUrlReload.current) {
+      skipUrlReload.current = false;
+      return;
+    }
+    setStatus(urlStatus);
+    setRefreshKey((k) => k + 1);
+  }, [urlStatus]);
 
   useEffect(() => {
     void loadRows();
@@ -132,11 +147,21 @@ export function ScholarshipDesk() {
             <p className="mt-1 text-sm text-slate-600">Track every scholarship stage and update student records directly.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="chip-neutral">Applied: {counts.APPLIED || 0}</span>
-            <span className="chip-warning">Under Process: {counts.UNDER_PROCESS || 0}</span>
-            <span className="chip-danger">Query: {counts.QUERY_BY_DEPARTMENT || 0}</span>
-            <span className="chip-success">Approved: {counts.APPROVED || 0}</span>
-            <span className="chip-success">Credited: {counts.CREDITED || 0}</span>
+            <Link className="chip-neutral transition hover:opacity-90" href={"/modules/scholarship?status=APPLIED" as Route}>
+              Applied: {counts.APPLIED || 0}
+            </Link>
+            <Link className="chip-warning transition hover:opacity-90" href={"/modules/scholarship?status=UNDER_PROCESS" as Route}>
+              Under Process: {counts.UNDER_PROCESS || 0}
+            </Link>
+            <Link className="chip-danger transition hover:opacity-90" href={"/modules/scholarship?status=QUERY_BY_DEPARTMENT" as Route}>
+              Query: {counts.QUERY_BY_DEPARTMENT || 0}
+            </Link>
+            <Link className="chip-success transition hover:opacity-90" href={"/modules/scholarship?status=APPROVED" as Route}>
+              Approved: {counts.APPROVED || 0}
+            </Link>
+            <Link className="chip-success transition hover:opacity-90" href={"/modules/scholarship?status=CREDITED" as Route}>
+              Credited: {counts.CREDITED || 0}
+            </Link>
           </div>
         </div>
 
