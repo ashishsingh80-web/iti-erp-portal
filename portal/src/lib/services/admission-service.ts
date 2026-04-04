@@ -59,10 +59,8 @@ export function buildTradeCycleSessionVariants(session: string, durationYears: n
 }
 
 /**
- * For a 2-year cycle label like `2026-28` (cohort starting calendar year 2026), returns the
- * immediately prior cycle `2025-27`. Workshop seats are shared: 1st-year students in the current
- * cycle occupy seats together with 2nd-year students still in the previous cycle until that batch
- * completes (then only the next overlap applies, e.g. 2027-29 1st + 2026-28 2nd).
+ * For a 2-year cycle label like `2026-28`, returns the prior cycle `2025-27`. Used to include
+ * learners still stored under the old session label (e.g. not yet promoted) alongside the new cycle.
  */
 export function previousTwoYearCycleSession(session: string): string | null {
   const normalized = normalizeSessionLabel((session || "").trim());
@@ -75,48 +73,51 @@ export function previousTwoYearCycleSession(session: string): string | null {
   return `${prevStart}-${String(endYear).slice(-2)}`;
 }
 
+/**
+ * Who counts against workshop seats for this admission cycle:
+ * - All 1st/2nd-year students under the current cycle session (incl. promoted 2nd years — their
+ *   `session` is advanced via `promoteStudentToSecondYear` to match the new batch label).
+ * - Plus all 1st/2nd under the prior cycle session (legacy / not yet session-bumped), so overlap
+ *   with the outgoing batch still works.
+ */
+function buildTwoYearWorkshopSeatOr(session: string): Prisma.StudentWhereInput[] {
+  const variantsS = buildTradeCycleSessionVariants(session, 2);
+  const prev = previousTwoYearCycleSession(session);
+  const variantsPrev = prev ? buildTradeCycleSessionVariants(prev, 2) : [];
+  const orBranch: Prisma.StudentWhereInput[] = [];
+  if (variantsS.length) {
+    orBranch.push({ session: { in: variantsS }, yearLabel: { in: ["1st", "2nd"] } });
+  }
+  if (variantsPrev.length) {
+    orBranch.push({ session: { in: variantsPrev }, yearLabel: { in: ["1st", "2nd"] } });
+  }
+  return orBranch;
+}
+
 async function loadTwoYearConcurrentSeatUsageByUnit(
   instituteId: string,
   tradeId: string,
   session: string
 ): Promise<Map<number, number>> {
-  const variantsS = buildTradeCycleSessionVariants(session, 2);
-  const prev = previousTwoYearCycleSession(session);
-  const variantsPrev = prev ? buildTradeCycleSessionVariants(prev, 2) : [];
   const base = { instituteId, tradeId, deletedAt: null, ...workshopSeatLifecycleWhere };
+  const orBranch = buildTwoYearWorkshopSeatOr(session);
+  if (!orBranch.length) {
+    return new Map();
+  }
 
-  const [firstRows, secondRows] = await Promise.all([
-    prisma.student.groupBy({
-      by: ["unitNumber"],
-      where: {
-        ...base,
-        yearLabel: "1st",
-        ...(variantsS.length ? { session: { in: variantsS } } : {})
-      },
-      _count: { _all: true }
-    }),
-    variantsPrev.length
-      ? prisma.student.groupBy({
-          by: ["unitNumber"],
-          where: {
-            ...base,
-            yearLabel: "2nd",
-            session: { in: variantsPrev }
-          },
-          _count: { _all: true }
-        })
-      : Promise.resolve([])
-  ]);
+  const rows = await prisma.student.groupBy({
+    by: ["unitNumber"],
+    where: {
+      ...base,
+      OR: orBranch
+    },
+    _count: { _all: true }
+  });
 
   const usedByUnit = new Map<number, number>();
-  for (const row of firstRows) {
+  for (const row of rows) {
     if (row.unitNumber != null) {
-      usedByUnit.set(row.unitNumber, (usedByUnit.get(row.unitNumber) || 0) + row._count._all);
-    }
-  }
-  for (const row of secondRows) {
-    if (row.unitNumber != null) {
-      usedByUnit.set(row.unitNumber, (usedByUnit.get(row.unitNumber) || 0) + row._count._all);
+      usedByUnit.set(row.unitNumber, row._count._all);
     }
   }
   return usedByUnit;
@@ -162,27 +163,15 @@ export async function countStudentsOnUnitForAdmission(params: {
     });
   }
 
-  const variantsS = buildTradeCycleSessionVariants(params.session, 2);
-
-  if (params.yearLabel === "1st") {
-    const prev = previousTwoYearCycleSession(params.session);
-    const variantsPrev = prev ? buildTradeCycleSessionVariants(prev, 2) : [];
-    const orBranch: Prisma.StudentWhereInput[] = [{ session: { in: variantsS }, yearLabel: "1st" }];
-    if (variantsPrev.length) {
-      orBranch.push({ session: { in: variantsPrev }, yearLabel: "2nd" });
-    }
-    return prisma.student.count({
-      where: {
-        ...base,
-        OR: orBranch
-      }
-    });
+  const orBranch = buildTwoYearWorkshopSeatOr(params.session);
+  if (!orBranch.length) {
+    return 0;
   }
 
   return prisma.student.count({
     where: {
       ...base,
-      ...(variantsS.length ? { session: { in: variantsS } } : {})
+      OR: orBranch
     }
   });
 }
