@@ -2,11 +2,12 @@ import { AdmissionMode, StudentStatus, VerificationStatus } from "@prisma/client
 import { NextResponse } from "next/server";
 import { assertUserActionAccess } from "@/lib/access";
 import { requireUser } from "@/lib/auth";
+import { type CsvRow, parseCsv, pickCsvField } from "@/lib/csv-import-utils";
+import { tradeUnitCatalog } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { reserveGeneratedCode } from "@/lib/numbering-config";
+import { buildTradeCycleSessionVariants, countStudentsOnUnitForAdmission } from "@/lib/services/admission-service";
 import { normalizeSessionLabel } from "@/lib/session-config";
-
-type CsvRow = Record<string, string>;
 type InstituteTrade = {
   id: string;
   tradeCode: string;
@@ -35,75 +36,26 @@ type ParsedImportRow = {
   problems: string[];
 };
 
-function parseCsv(text: string) {
-  const rows: string[][] = [];
-  let current = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-
-    if (char === '"') {
-      if (inQuotes && next === '"') {
-        current += '"';
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (char === "," && !inQuotes) {
-      row.push(current.trim());
-      current = "";
-      continue;
-    }
-
-    if ((char === "\n" || char === "\r") && !inQuotes) {
-      if (char === "\r" && next === "\n") index += 1;
-      row.push(current.trim());
-      if (row.some((item) => item.length)) rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += char;
-  }
-
-  row.push(current.trim());
-  if (row.some((item) => item.length)) rows.push(row);
-  if (!rows.length) return [];
-
-  const headers = rows[0].map((item) => item.trim());
-  return rows.slice(1).map((items) => {
-    const output: CsvRow = {};
-    headers.forEach((header, headerIndex) => {
-      output[header] = items[headerIndex]?.trim() || "";
-    });
-    return output;
-  });
-}
-
 function pickValue(row: CsvRow, keys: string[]) {
-  for (const key of keys) {
-    const found = row[key];
-    if (typeof found === "string" && found.trim()) return found.trim();
-  }
-  return "";
+  return pickCsvField(row, keys);
 }
 
 function parseDate(value: string) {
   if (!value.trim()) return null;
-  const match = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (match) {
-    const [, dd, mm, yyyy] = match;
+  const trimmed = value.trim();
+  const dmy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
     const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
     return Number.isNaN(date.getTime()) ? null : date;
   }
-  const date = new Date(value);
+  const ymd = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (ymd) {
+    const [, yyyy, mm, dd] = ymd;
+    const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(trimmed);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -252,11 +204,36 @@ export async function POST(request: Request) {
         continue;
       }
       const guardianName = item.fatherName || "NOT PROVIDED";
+      const tradeKey = `${item.institute.instituteCode}::${item.trade.tradeCode}`;
+      const tradeConfig = tradeUnitCatalog[tradeKey];
+      const yearLabel = item.yearLabel || "1st";
+      const normalizedSession = tradeConfig
+        ? buildTradeCycleSessionVariants(item.session, tradeConfig.durationYears)[0] || normalizeSessionLabel(item.session)
+        : normalizeSessionLabel(item.session);
+
+      if (tradeConfig) {
+        if (item.unitNumber < 1 || item.unitNumber > tradeConfig.unitCount) {
+          skipped.push(`${item.fullName} (Row ${item.rowNumber}): Unit ${item.unitNumber} invalid (trade has ${tradeConfig.unitCount} units)`);
+          continue;
+        }
+        const existingOnUnit = await countStudentsOnUnitForAdmission({
+          instituteId: item.institute.id,
+          tradeId: item.trade.id,
+          tradeKey,
+          unitNumber: item.unitNumber,
+          session: normalizedSession,
+          yearLabel
+        });
+        if (existingOnUnit >= tradeConfig.seatsPerUnit) {
+          skipped.push(`${item.fullName} (Row ${item.rowNumber}): Unit ${item.unitNumber} is full (${tradeConfig.seatsPerUnit} seats)`);
+          continue;
+        }
+      }
 
       const studentCode = await reserveGeneratedCode("student", {
         institute: item.institute.instituteCode,
         trade: item.trade.tradeCode,
-        session: item.session
+        session: normalizedSession
       });
 
       const created = await prisma.student.create({
@@ -269,8 +246,8 @@ export async function POST(request: Request) {
           unitNumber: item.unitNumber,
           createdById: user.id,
           admissionMode: AdmissionMode.DIRECT,
-          session: item.session,
-          yearLabel: item.yearLabel || "1st",
+          session: normalizedSession,
+          yearLabel,
           admissionDate: parseDate(pickValue(item.sourceRow, ["admissionDate"])) || new Date(),
           admissionType: pickValue(item.sourceRow, ["admissionType"]) || "DIRECT",
           admissionStatusLabel: pickValue(item.sourceRow, ["admissionStatus", "admissionStatusLabel"]) || "REGISTERED",
