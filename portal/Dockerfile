@@ -25,6 +25,13 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # Generate prisma client before building
 # It is actually generated on postinstall but let's be explicit
 RUN npx prisma generate
+
+# Provide dummy environment variables to satisfy Next.js during static prerendering
+# These ONLY apply to the build step and are NOT included in the final image or runtime
+ENV AUTH_SECRET="dummy-secret-for-build-time-only"
+ENV NEXTAUTH_SECRET="dummy-secret-for-build-time-only"
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+
 RUN npm run build
 
 # Production image, copy all the files and run next
