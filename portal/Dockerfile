@@ -43,6 +43,8 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # Cloud Run injects the PORT env var
 ENV PORT 8080
 
+RUN apk add --no-cache openssl
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
