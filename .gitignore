@@ -7,3 +7,8 @@ node_modules
 # Serwist (generated at build)
 portal/public/sw.js
 portal/public/swe-worker*
+
+# Environment files
+.env.prod
+.env.production
+.env.test
